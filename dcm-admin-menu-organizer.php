@@ -194,18 +194,33 @@ class DCM_Admin_Menu_Organizer {
 	 * @return bool 有効な場合は true
 	 */
 	private function is_valid_config_file_path( string $path ): bool {
+		if ( empty( $path ) ) {
+			return false;
+		}
+
+		// 基本的なパストラバーサル対策（相対パス、nullバイトなど）
+		if ( strpos( $path, '..' ) !== false || strpos( $path, "\0" ) !== false ) {
+			return false;
+		}
+
 		$real_path = realpath( $path );
 		if ( false === $real_path ) {
-			return false;
+			// ファイルが存在しない場合は、パス自体の妥当性のみチェック
+			// フィルターで変更された場合は開発者が意図的に指定したパスとみなす
+			return true;
 		}
 
-		$content_dir = realpath( WP_CONTENT_DIR );
-		if ( false === $content_dir ) {
-			return false;
+		// デフォルトパスの場合は WP_CONTENT_DIR 内をチェック
+		$default_config_file = WP_CONTENT_DIR . '/dcm-admin-menu-organizer/settings.json';
+		if ( $this->config_file === $default_config_file ) {
+			$content_dir = realpath( WP_CONTENT_DIR );
+			if ( false !== $content_dir ) {
+				return strpos( $real_path, $content_dir ) === 0;
+			}
 		}
 
-		// WP_CONTENT_DIR内のみ許可（パストラバーサル対策）
-		return strpos( $real_path, $content_dir ) === 0;
+		// フィルターで変更された場合は、基本的な検証のみ（開発者が意図的に変更したパスとみなす）
+		return true;
 	}
 
 	/**
