@@ -185,6 +185,30 @@ class DCM_Admin_Menu_Organizer {
 	}
 
 	/**
+	 * 設定ファイルのパスが有効かどうかを検証
+	 *
+	 * @since 1.2.2
+	 *
+	 * @param string $path 検証するファイルパス
+	 *
+	 * @return bool 有効な場合は true
+	 */
+	private function is_valid_config_file_path( string $path ): bool {
+		$real_path = realpath( $path );
+		if ( false === $real_path ) {
+			return false;
+		}
+
+		$content_dir = realpath( WP_CONTENT_DIR );
+		if ( false === $content_dir ) {
+			return false;
+		}
+
+		// WP_CONTENT_DIR内のみ許可（パストラバーサル対策）
+		return strpos( $real_path, $content_dir ) === 0;
+	}
+
+	/**
 	 * JSON設定ファイルから設定を読み込む（キャッシュ機能付き）
 	 *
 	 * @since 1.2.0
@@ -195,6 +219,13 @@ class DCM_Admin_Menu_Organizer {
 		// キャッシュがあればそれを返す
 		if ( null !== $this->cached_config ) {
 			return $this->cached_config;
+		}
+
+		// ファイルパスの検証（セキュリティ対策）
+		if ( ! $this->is_valid_config_file_path( $this->config_file ) ) {
+			error_log( 'DCM Admin Menu Organizer: Invalid config file path: ' . $this->config_file );
+			$this->cached_config = null;
+			return null;
 		}
 
 		// ファイルが存在しない場合
@@ -290,7 +321,7 @@ class DCM_Admin_Menu_Organizer {
 	/**
 	 * 未指定メニュー非表示設定を取得（ファイル優先）
 	 *
-	 * @since 1.3.0
+	 * @since 1.2.2
 	 *
 	 * @return bool 未指定メニューを非表示にする場合は true
 	 */
@@ -532,39 +563,6 @@ tools.php</pre>
 		});
 		</script>
 		<?php
-	}
-
-	/**
-	 * 現在の親メニュー一覧を表示
-	 *
-	 * @since 1.0.0
-	 *
-	 * @return void
-	 */
-	private function display_current_menus(): void {
-		global $menu;
-
-		if ( empty( $menu ) ) {
-			echo '<p>メニュー情報を取得できませんでした。</p>';
-			return;
-		}
-
-		echo '<ul style="margin: 0; padding-left: 20px; list-style: disc;">';
-		foreach ( $menu as $item ) {
-			// セパレーターはスキップ
-			if ( empty( $item[0] ) || strpos( $item[4], 'wp-menu-separator' ) !== false ) {
-				continue;
-			}
-
-			$slug  = $item[2];
-			$title = wp_strip_all_tags( $item[0] );
-
-			echo '<li>';
-			echo '<code>' . esc_html( $slug ) . '</code>';
-			echo ' → ' . esc_html( $title );
-			echo '</li>';
-		}
-		echo '</ul>';
 	}
 
 	/**
@@ -1113,8 +1111,18 @@ tools.php</pre>
 		$accordion_groups_json = wp_json_encode( $accordion_groups );
 		
 		// 設定のハッシュ値を生成（設定が変わったら古いデータを無視するため）
-		$settings     = get_option( $this->option_name, '' );
-		$config_hash  = md5( $settings );
+		// ファイル設定が有効な場合はファイル内容のハッシュを使用
+		if ( $this->is_file_config_active() ) {
+			$config = $this->load_config_from_file();
+			if ( null !== $config ) {
+				$config_hash = md5( wp_json_encode( $config ) );
+			} else {
+				$config_hash = '';
+			}
+		} else {
+			$settings    = get_option( $this->option_name, '' );
+			$config_hash = md5( $settings );
+		}
 		?>
 		<script id="dcm-accordion-script">
 		(function() {
