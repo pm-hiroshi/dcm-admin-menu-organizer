@@ -75,6 +75,13 @@ class DCM_Admin_Menu_Organizer {
 	private string $config_file;
 
 	/**
+	 * デフォルトの設定ファイルパス
+	 *
+	 * @var string
+	 */
+	private string $default_config_file;
+
+	/**
 	 * コンストラクタ
 	 *
 	 * WordPress のアクションフックに登録
@@ -82,8 +89,8 @@ class DCM_Admin_Menu_Organizer {
 	 * @since 1.0.0
 	 */
 	public function __construct() {
-		// 設定ファイルのパスを設定（フィルターで変更可能）
-		$default_config_file = WP_CONTENT_DIR . '/dcm-admin-menu-organizer/settings.json';
+		// デフォルトの設定ファイルパスを保存
+		$this->default_config_file = WP_CONTENT_DIR . '/dcm-admin-menu-organizer/settings.json';
 		
 		/**
 		 * 設定ファイルのパスをフィルターで変更可能にする
@@ -92,7 +99,7 @@ class DCM_Admin_Menu_Organizer {
 		 *
 		 * @param string $config_file 設定ファイルのフルパス
 		 */
-		$this->config_file = apply_filters( 'dcm_admin_menu_organizer_config_file', $default_config_file );
+		$this->config_file = apply_filters( 'dcm_admin_menu_organizer_config_file', $this->default_config_file );
 
 		add_action( 'admin_menu', [ $this, 'add_settings_page' ] );
 		add_action( 'admin_init', [ $this, 'register_settings' ] );
@@ -225,8 +232,7 @@ class DCM_Admin_Menu_Organizer {
 
 		// デフォルトパスの場合は WP_CONTENT_DIR 内をチェック（シンボリックリンク解決後）
 		// パラメータ $path とデフォルトパスを直接比較（$this->config_file はフィルターで変更されている可能性があるため）
-		$default_config_file = WP_CONTENT_DIR . '/dcm-admin-menu-organizer/settings.json';
-		if ( $path === $default_config_file ) {
+		if ( $path === $this->default_config_file ) {
 			$content_dir = realpath( WP_CONTENT_DIR );
 			if ( false !== $content_dir ) {
 				// シンボリックリンク解決後のパスで比較
