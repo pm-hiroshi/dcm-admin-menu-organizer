@@ -486,13 +486,6 @@ li[id^="separator-text-"]::after {
 }
 ```
 
-### プログラムからの設定更新
-
-```php
-$menu_order = "index.php\nedit.php\nseparator: グループ\nupload.php";
-update_option('dcm_admin_menu_order', $menu_order);
-```
-
 ### メニュースラッグの取得
 
 ```php
