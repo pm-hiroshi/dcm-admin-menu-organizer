@@ -224,8 +224,9 @@ class DCM_Admin_Menu_Organizer {
 		}
 
 		// デフォルトパスの場合は WP_CONTENT_DIR 内をチェック（シンボリックリンク解決後）
+		// パラメータ $path とデフォルトパスを直接比較（$this->config_file はフィルターで変更されている可能性があるため）
 		$default_config_file = WP_CONTENT_DIR . '/dcm-admin-menu-organizer/settings.json';
-		if ( $this->config_file === $default_config_file ) {
+		if ( $path === $default_config_file ) {
 			$content_dir = realpath( WP_CONTENT_DIR );
 			if ( false !== $content_dir ) {
 				// シンボリックリンク解決後のパスで比較
@@ -1148,13 +1149,9 @@ tools.php</pre>
 		
 		// 設定のハッシュ値を生成（設定が変わったら古いデータを無視するため）
 		// ファイル設定が有効な場合はファイル内容のハッシュを使用
-		if ( $this->is_file_config_active() ) {
-			$config = $this->load_config_from_file();
-			if ( null !== $config ) {
-				$config_hash = md5( wp_json_encode( $config ) );
-			} else {
-				$config_hash = '';
-			}
+		$config = $this->load_config_from_file();
+		if ( null !== $config ) {
+			$config_hash = md5( wp_json_encode( $config ) );
 		} else {
 			$settings    = get_option( $this->option_name, '' );
 			$config_hash = md5( $settings );
