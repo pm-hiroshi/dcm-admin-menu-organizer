@@ -3,7 +3,7 @@
  * Plugin Name: DCM Admin Menu Organizer
  * Plugin URI: https://example.com
  * Description: 管理画面の親メニューの表示順を制御し、セパレーターを追加できます
- * Version: 1.2.2
+ * Version: 1.2.3
  * Author: Your Name
  * Author URI: https://example.com
  * License: GPL v2 or later
@@ -206,11 +206,13 @@ class DCM_Admin_Menu_Organizer {
 	/**
 	 * 設定ファイルのパスが有効かどうかを検証
 	 *
+	 * パスの妥当性（セキュリティ）とファイルの存在の両方をチェックします。
+	 *
 	 * @since 1.2.2
 	 *
 	 * @param string $path 検証するファイルパス
 	 *
-	 * @return bool 有効な場合は true
+	 * @return bool 有効で存在する場合は true
 	 */
 	private function is_valid_config_file_path( string $path ): bool {
 		if ( empty( $path ) ) {
@@ -222,12 +224,15 @@ class DCM_Admin_Menu_Organizer {
 			return false;
 		}
 
+		// ファイルの存在チェック
+		if ( ! file_exists( $path ) ) {
+			return false;
+		}
+
 		// シンボリックリンクを解決して実際のパスを取得
 		$real_path = realpath( $path );
 		if ( false === $real_path ) {
-			// ファイルが存在しない場合は、パス自体の妥当性のみチェック
-			// フィルターで変更された場合は開発者が意図的に指定したパスとみなす
-			return true;
+			return false;
 		}
 
 		// デフォルトパスの場合は WP_CONTENT_DIR 内をチェック（シンボリックリンク解決後）
@@ -258,15 +263,8 @@ class DCM_Admin_Menu_Organizer {
 			return $this->cached_config;
 		}
 
-		// ファイルパスの検証（セキュリティ対策）
+		// ファイルパスの検証（セキュリティ対策と存在チェック）
 		if ( ! $this->is_valid_config_file_path( $this->config_file ) ) {
-			error_log( 'DCM Admin Menu Organizer: Invalid config file path: ' . $this->config_file );
-			$this->cached_config = null;
-			return null;
-		}
-
-		// ファイルが存在しない場合
-		if ( ! file_exists( $this->config_file ) ) {
 			$this->cached_config = null;
 			return null;
 		}
@@ -274,13 +272,7 @@ class DCM_Admin_Menu_Organizer {
 		// ファイルを読み込み
 		$json_content = file_get_contents( $this->config_file );
 		if ( false === $json_content ) {
-			$error_details = [
-				'file'     => $this->config_file,
-				'exists'   => file_exists( $this->config_file ) ? 'yes' : 'no',
-				'readable' => is_readable( $this->config_file ) ? 'yes' : 'no',
-				'error'    => error_get_last() ? error_get_last()['message'] : 'unknown',
-			];
-			error_log( 'DCM Admin Menu Organizer: Failed to read config file. Details: ' . wp_json_encode( $error_details ) );
+			error_log( 'DCM Admin Menu Organizer: Failed to read config file: ' . $this->config_file );
 			$this->cached_config = null;
 			return null;
 		}
