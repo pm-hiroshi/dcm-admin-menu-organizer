@@ -168,6 +168,11 @@ class DCM_Admin_Menu_Organizer {
 	 * @return string サニタイズされた文字列
 	 */
 	public function sanitize_menu_order( string $input ): string {
+		// 権限チェック（明示的なセキュリティ対策）
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return get_option( $this->option_name, '' );
+		}
+
 		return sanitize_textarea_field( $input );
 	}
 
@@ -181,6 +186,13 @@ class DCM_Admin_Menu_Organizer {
 	 * @return bool サニタイズされた真偽値
 	 */
 	public function sanitize_accordion_option( $input ): bool {
+		// 権限チェック（明示的なセキュリティ対策）
+		if ( ! current_user_can( 'manage_options' ) ) {
+			// 現在の値を返す（変更を拒否）
+			$option_name = isset( $_POST[ $this->accordion_option_name ] ) ? $this->accordion_option_name : $this->hide_unspecified_option_name;
+			return (bool) get_option( $option_name, false );
+		}
+
 		return (bool) $input;
 	}
 
@@ -203,6 +215,7 @@ class DCM_Admin_Menu_Organizer {
 			return false;
 		}
 
+		// シンボリックリンクを解決して実際のパスを取得
 		$real_path = realpath( $path );
 		if ( false === $real_path ) {
 			// ファイルが存在しない場合は、パス自体の妥当性のみチェック
@@ -210,16 +223,18 @@ class DCM_Admin_Menu_Organizer {
 			return true;
 		}
 
-		// デフォルトパスの場合は WP_CONTENT_DIR 内をチェック
+		// デフォルトパスの場合は WP_CONTENT_DIR 内をチェック（シンボリックリンク解決後）
 		$default_config_file = WP_CONTENT_DIR . '/dcm-admin-menu-organizer/settings.json';
 		if ( $this->config_file === $default_config_file ) {
 			$content_dir = realpath( WP_CONTENT_DIR );
 			if ( false !== $content_dir ) {
+				// シンボリックリンク解決後のパスで比較
 				return strpos( $real_path, $content_dir ) === 0;
 			}
 		}
 
 		// フィルターで変更された場合は、基本的な検証のみ（開発者が意図的に変更したパスとみなす）
+		// シンボリックリンクは既にrealpath()で解決されているため、安全
 		return true;
 	}
 
@@ -252,7 +267,13 @@ class DCM_Admin_Menu_Organizer {
 		// ファイルを読み込み
 		$json_content = file_get_contents( $this->config_file );
 		if ( false === $json_content ) {
-			error_log( 'DCM Admin Menu Organizer: Failed to read config file: ' . $this->config_file );
+			$error_details = [
+				'file'     => $this->config_file,
+				'exists'   => file_exists( $this->config_file ) ? 'yes' : 'no',
+				'readable' => is_readable( $this->config_file ) ? 'yes' : 'no',
+				'error'    => error_get_last() ? error_get_last()['message'] : 'unknown',
+			];
+			error_log( 'DCM Admin Menu Organizer: Failed to read config file. Details: ' . wp_json_encode( $error_details ) );
 			$this->cached_config = null;
 			return null;
 		}
@@ -569,7 +590,7 @@ tools.php</pre>
 					$menu_slugs_json = wp_json_encode( $menu_slugs );
 					?>
 					
-					const menuSlugs = <?php echo $menu_slugs_json; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>;
+					const menuSlugs = <?php echo esc_js( $menu_slugs_json ); ?>;
 					textarea.value = '# 現在のメニュー順序\n' + menuSlugs.join('\n');
 					
 					alert('メニューをインポートしました！\n必要に応じてseparatorを追加してください。');
@@ -1144,7 +1165,7 @@ tools.php</pre>
 			// 初期化中はメニューを非表示（FOUCを防ぐ）
 			document.body.classList.add('dcm-accordion-loading');
 			
-			const accordionGroups = <?php echo $accordion_groups_json; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>;
+			const accordionGroups = <?php echo esc_js( $accordion_groups_json ); ?>;
 			const storageKey = 'dcm_accordion_state';
 			const configHash = '<?php echo esc_js( $config_hash ); ?>';
 			
