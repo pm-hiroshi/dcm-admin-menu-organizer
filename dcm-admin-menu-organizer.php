@@ -206,13 +206,13 @@ class DCM_Admin_Menu_Organizer {
 	/**
 	 * 設定ファイルのパスが有効かどうかを検証
 	 *
-	 * パスの妥当性（セキュリティ）とファイルの存在の両方をチェックします。
+	 * パスの妥当性（セキュリティ）、ファイルの存在、読み取り可能性の両方をチェックします。
 	 *
 	 * @since 1.2.2
 	 *
 	 * @param string $path 検証するファイルパス
 	 *
-	 * @return bool 有効で存在する場合は true
+	 * @return bool 有効で存在し読み取り可能な場合は true
 	 */
 	private function is_valid_config_file_path( string $path ): bool {
 		if ( empty( $path ) ) {
@@ -226,6 +226,11 @@ class DCM_Admin_Menu_Organizer {
 
 		// ファイルの存在チェック
 		if ( ! file_exists( $path ) ) {
+			return false;
+		}
+
+		// ファイルの読み取り可能性チェック
+		if ( ! is_readable( $path ) ) {
 			return false;
 		}
 
