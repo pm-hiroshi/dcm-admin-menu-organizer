@@ -149,7 +149,7 @@ class DCM_Admin_Menu_Organizer {
 			$this->accordion_option_name,
 			[
 				'type'              => 'boolean',
-				'sanitize_callback' => [ $this, 'sanitize_accordion_option' ],
+				'sanitize_callback' => [ $this, 'sanitize_boolean_option' ],
 				'default'           => false,
 			]
 		);
@@ -159,7 +159,7 @@ class DCM_Admin_Menu_Organizer {
 			$this->hide_unspecified_option_name,
 			[
 				'type'              => 'boolean',
-				'sanitize_callback' => [ $this, 'sanitize_accordion_option' ],
+				'sanitize_callback' => [ $this, 'sanitize_boolean_option' ],
 				'default'           => false,
 			]
 		);
@@ -184,7 +184,7 @@ class DCM_Admin_Menu_Organizer {
 	}
 
 	/**
-	 * アコーディオンオプションをサニタイズ
+	 * 真偽値オプション（アコーディオン/未指定メニュー非表示）をサニタイズ
 	 *
 	 * @since 1.2.0
 	 *
@@ -192,7 +192,7 @@ class DCM_Admin_Menu_Organizer {
 	 *
 	 * @return bool サニタイズされた真偽値
 	 */
-	public function sanitize_accordion_option( $input ): bool {
+	public function sanitize_boolean_option( $input ): bool {
 		// 権限チェック（明示的なセキュリティ対策）
 		if ( ! current_user_can( 'manage_options' ) ) {
 			// 現在の値を返す（変更を拒否）

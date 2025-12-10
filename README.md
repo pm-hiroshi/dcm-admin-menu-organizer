@@ -331,6 +331,31 @@ localStorage.removeItem('dcm_accordion_state');
 location.reload();
 ```
 
+## JSON設定ファイルサンプル
+
+`wp-content/dcm-admin-menu-organizer/settings.json` を配置すると、ファイル設定がDBより優先され、管理画面は読み取り専用になります。
+
+```json
+{
+  "menu_order": [
+    "index.php",
+    "separator: コンテンツ|#f0f6fc|#0969da|#0969da|#0969da",
+    "edit.php",
+    "upload.php",
+    "options-general.php",
+    "themes.php",
+    "plugins.php"
+  ],
+  "accordion_enabled": true,
+  "hide_unspecified": false
+}
+```
+
+- `menu_order`: 並び順。`separator` / `separator: テキスト` / `separator: テキスト|背景色|文字色|左ボーダー色|アイコン色` の記法が使えます。
+- `accordion_enabled`: trueでアコーディオン有効。
+- `hide_unspecified`: trueで設定に含まれないメニューを非表示（デフォルトは末尾追加）。
+- 設定ファイルのパスはフィルター `dcm_admin_menu_organizer_config_file` で変更可能。
+
 ## 技術仕様
 
 ### 要件
