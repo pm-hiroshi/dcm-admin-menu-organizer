@@ -10,6 +10,9 @@
 	const storageKey = 'dcm_accordion_state';
 	const configHash = data.config_hash || '';
 
+	/**
+	 * 管理画面内の href を正規化し、/wp-admin/ 以降のパス+クエリをキーとして返す。
+	 */
 	function normalizeAdminHref(href) {
 		try {
 			const url = new URL(href, window.location.origin);
@@ -36,6 +39,8 @@
 			}
 			if (!map.has(key)) {
 				map.set(key, li);
+			} else {
+				console.warn('DCM Accordion: Duplicate menu href detected, keeping first item', key);
 			}
 		});
 		return map;
@@ -77,6 +82,9 @@
 		}
 	}
 
+	/**
+	 * レイアウト再計算をワンショットで呼ぶ（WP側のメニュー崩れ防止）。
+	 */
 	const triggerResize = (() => {
 		let resizeId = null;
 		return () => {
@@ -90,6 +98,9 @@
 		};
 	})();
 
+	/**
+	 * アコーディオン初期化: メニュー索引を作成し、保存状態を適用、クリックで開閉。
+	 */
 	function initAccordion() {
 		const state = getAccordionState();
 		const menuIndex = buildMenuIndex();
