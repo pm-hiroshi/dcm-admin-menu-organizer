@@ -1050,7 +1050,9 @@ tools.php</pre>
 			}
 
 			$separator_id = 'separator-group-' . $group_id;
-			$menu_slugs   = $group['menus'];
+			// 設定（並び替え）は $menu のスラッグ前提だが、
+			// アコーディオン（JS）は a[href] と突合するため href 形式に正規化して渡す。
+			$menu_slugs   = array_map( [ $this, 'normalize_menu_slug_for_href_match' ], $group['menus'] );
 			$icon_color   = ! empty( $group['separator']['icon_color'] ) ? $group['separator']['icon_color'] : '';
 
 			$accordion_groups[] = [
@@ -1061,6 +1063,49 @@ tools.php</pre>
 		}
 
 		return ! empty( $accordion_groups ) ? $accordion_groups : null;
+	}
+
+	/**
+	 * メニューslugを、JS側でa[href]と一致しやすいhref形式に寄せる。
+	 *
+	 * - WordPressの $menu の slug は「page値のみ」になるケースがある（例: wp-dbmanager/database-manager.php）
+	 * - DOM側は a[href]="admin.php?page=..." になるため、ここで表記ゆれを吸収する
+	 *
+	 * 重要: 並び替え処理は slug 前提のため、ここで返す値はアコーディオン用途に限定する。
+	 *
+	 * @since 1.2.6
+	 *
+	 * @param string $slug メニューslug（設定内の1行）
+	 * @return string href突合用の文字列
+	 */
+	private function normalize_menu_slug_for_href_match( string $slug ): string {
+		$slug = trim( $slug );
+		if ( '' === $slug ) {
+			return '';
+		}
+
+		// 既にURL形式ならそのまま
+		if ( 0 === strpos( $slug, 'admin.php?page=' ) ) {
+			return $slug;
+		}
+
+		// 例: wp_file_manager のような「page値のみ」→ admin.php?page= を補完
+		$has_php   = strpos( $slug, '.php' ) !== false;
+		$has_q     = strpos( $slug, '?' ) !== false;
+		$has_slash = strpos( $slug, '/' ) !== false;
+
+		// スラッシュ無し（単一スラッグ）の場合は、従来仕様に合わせてURL形式に寄せる
+		if ( ! $has_php && ! $has_q && ! $has_slash ) {
+			return 'admin.php?page=' . $slug;
+		}
+
+		// スラッシュ＋.php（例: wp-dbmanager/database-manager.php）は page 値として扱われることが多い
+		if ( $has_slash && $has_php && ! $has_q ) {
+			return 'admin.php?page=' . $slug;
+		}
+
+		// edit.php?post_type=... 等はそのまま href として扱う
+		return $slug;
 	}
 
 	/**
