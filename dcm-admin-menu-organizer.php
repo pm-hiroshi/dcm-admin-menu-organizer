@@ -994,29 +994,26 @@ tools.php</pre>
 	}
 
 	/**
-	 * 設定で入力された値（URL/slug）を、WordPress の $menu で使われる slug に正規化する。
+	 * 設定値/メニューhrefを、比較用の「wp-admin相対パス+クエリ」に正規化する。
 	 *
-	 * 目的:
-	 * - 設定は「URL形式」で統一できる（人間が認知しやすい）
-	 * - 並び替え/表示判定は「$menu のキー（slug）」で確実に動く
-	 *
-	 * 対応例:
-	 * - admin.php?page=wp-dbmanager/database-manager.php → wp-dbmanager/database-manager.php
-	 * - /wp-admin/admin.php?page=wp_file_manager → wp_file_manager
-	 * - index.php / edit.php?post_type=page → そのまま
+	 * 例:
+	 * - https://example.test/wp-admin/admin.php?page=foo → admin.php?page=foo
+	 * - /wp-admin/edit.php?post_type=page → edit.php?post_type=page
+	 * - wp_file_manager → admin.php?page=wp_file_manager（後方互換）
+	 * - wp-dbmanager/database-manager.php → admin.php?page=wp-dbmanager/database-manager.php（後方互換）
 	 *
 	 * @since 1.2.6
 	 *
-	 * @param string $value 設定の1行
-	 * @return string $menu の slug
+	 * @param string $value 設定の1行、またはhref相当
+	 * @return string 正規化済みの相対パス+クエリ
 	 */
-	private function normalize_menu_value_to_menu_slug( string $value ): string {
+	private function normalize_admin_href_for_matching( string $value ): string {
 		$value = trim( $value );
 		if ( '' === $value ) {
 			return '';
 		}
 
-		// フルURLの場合は /wp-admin/ 以降に揃える
+		// フルURLなら wp-admin 配下に揃える
 		if ( 0 === strpos( $value, 'http://' ) || 0 === strpos( $value, 'https://' ) ) {
 			$path  = (string) wp_parse_url( $value, PHP_URL_PATH );
 			$query = (string) wp_parse_url( $value, PHP_URL_QUERY );
@@ -1027,25 +1024,112 @@ tools.php</pre>
 			} else {
 				$path = ltrim( $path, '/' );
 			}
-
 			$value = $path . ( '' !== $query ? '?' . $query : '' );
 		}
 
-		// 先頭の / を落として相対パスに
 		$value = ltrim( $value, '/' );
+		if ( 0 === strpos( $value, 'wp-admin/' ) ) {
+			$value = substr( $value, strlen( 'wp-admin/' ) );
+		}
 
-		// admin.php?page=... の場合は page 値が $menu の slug になることが多い
-		if ( 0 === strpos( $value, 'admin.php?' ) ) {
-			$query = (string) wp_parse_url( $value, PHP_URL_QUERY );
-			if ( '' !== $query ) {
-				parse_str( $query, $params );
-				if ( isset( $params['page'] ) && is_string( $params['page'] ) && '' !== $params['page'] ) {
-					return $params['page'];
-				}
-			}
+		// 旧形式（slugのみ）をURL形式へ寄せる
+		$has_php   = strpos( $value, '.php' ) !== false;
+		$has_q     = strpos( $value, '?' ) !== false;
+		$has_slash = strpos( $value, '/' ) !== false;
+
+		if ( ! $has_php && ! $has_q && ! $has_slash && 0 !== strpos( $value, 'admin.php' ) ) {
+			return 'admin.php?page=' . $value;
+		}
+
+		// wp-dbmanager/database-manager.php のような page 値（スラッシュ＋.php）も admin.php?page= に寄せる
+		if ( $has_slash && $has_php && ! $has_q && 0 !== strpos( $value, 'admin.php' ) ) {
+			return 'admin.php?page=' . $value;
 		}
 
 		return $value;
+	}
+
+	/**
+	 * WordPressコア（wp-admin/menu-header.php）の判定に合わせて、menu_slug から href を生成する。
+	 *
+	 * @since 1.2.6
+	 *
+	 * @param string $menu_slug $menu[*][2] の値
+	 * @return string href相当（wp-admin相対）
+	 */
+	private function get_admin_href_from_menu_slug( string $menu_slug ): string {
+		$menu_hook = get_plugin_page_hook( $menu_slug, 'admin.php' );
+		$menu_file = $menu_slug;
+		$pos       = strpos( $menu_file, '?' );
+
+		if ( false !== $pos ) {
+			$menu_file = substr( $menu_file, 0, $pos );
+		}
+
+		$is_plugin_page = ! empty( $menu_hook )
+			|| ( ( 'index.php' !== $menu_slug )
+				&& file_exists( WP_PLUGIN_DIR . "/$menu_file" )
+				&& ! file_exists( ABSPATH . "/wp-admin/$menu_file" ) );
+
+		return $is_plugin_page ? 'admin.php?page=' . $menu_slug : $menu_slug;
+	}
+
+	/**
+	 * 設定値（URL）を、現在の $menu に存在する menu_slug に解決する。
+	 *
+	 * 変換とマッチングをこの1箇所に閉じ込めるためのメソッド。
+	 *
+	 * @since 1.2.6
+	 *
+	 * @param array<int, array<string, mixed>> $groups グループ構造（menusは設定値の配列）
+	 * @param array<string, array<string, mixed>> $menu_by_slug $menu をslugで引ける配列
+	 * @param array<int, array<int, mixed>> $menu $menu そのもの
+	 * @return array<int, array<string, mixed>> menusをmenu_slug配列に解決したグループ
+	 */
+	private function resolve_groups_to_menu_slugs( array $groups, array $menu_by_slug, array $menu ): array {
+		$menu_by_href = [];
+
+		foreach ( $menu as $item ) {
+			if ( empty( $item[2] ) ) {
+				continue;
+			}
+			$slug = (string) $item[2];
+			$href = $this->get_admin_href_from_menu_slug( $slug );
+			$key  = $this->normalize_admin_href_for_matching( $href );
+			if ( '' === $key ) {
+				continue;
+			}
+			if ( ! isset( $menu_by_href[ $key ] ) ) {
+				$menu_by_href[ $key ] = $slug;
+			}
+		}
+
+		foreach ( $groups as &$group ) {
+			if ( empty( $group['menus'] ) ) {
+				continue;
+			}
+
+			$resolved = [];
+			foreach ( (array) $group['menus'] as $value ) {
+				$key = $this->normalize_admin_href_for_matching( (string) $value );
+				if ( '' === $key ) {
+					continue;
+				}
+				if ( ! isset( $menu_by_href[ $key ] ) ) {
+					continue;
+				}
+
+				$slug = $menu_by_href[ $key ];
+				if ( isset( $menu_by_slug[ $slug ] ) ) {
+					$resolved[] = $slug;
+				}
+			}
+
+			$group['menus'] = $resolved;
+		}
+		unset( $group );
+
+		return $groups;
 	}
 
 	/**
@@ -1085,30 +1169,11 @@ tools.php</pre>
 			];
 		}
 
-		// グループ構造を構築してフィルタリング
+		// グループ構造を構築（menusは設定値の配列のまま）
 		$groups = $this->build_menu_groups( $lines );
 
-		// 設定値（URL/slug）を $menu の slug に変換（並び替え/表示判定用）
-		foreach ( $groups as &$group ) {
-			if ( empty( $group['menus'] ) ) {
-				continue;
-			}
-
-			$normalized = [];
-			foreach ( $group['menus'] as $value ) {
-				$slug = $this->normalize_menu_value_to_menu_slug( (string) $value );
-				if ( '' === $slug ) {
-					continue;
-				}
-
-				// 実在するメニューだけ採用（未指定メニューの挙動と整合）
-				if ( isset( $menu_by_slug[ $slug ] ) ) {
-					$normalized[] = $slug;
-				}
-			}
-			$group['menus'] = $normalized;
-		}
-		unset( $group );
+		// 設定値（URL）を現在の $menu の menu_slug に解決（変換+突合を1箇所に集約）
+		$groups = $this->resolve_groups_to_menu_slugs( $groups, $menu_by_slug, $menu );
 
 		$groups = $this->filter_groups_with_visible_menus( $groups, $menu_by_slug );
 
@@ -1139,9 +1204,12 @@ tools.php</pre>
 			}
 
 			$separator_id = 'separator-group-' . $group_id;
-			// 設定（並び替え）は $menu のスラッグ前提だが、
-			// アコーディオン（JS）は a[href] と突合するため href 形式に正規化して渡す。
-			$menu_slugs   = array_map( [ $this, 'normalize_menu_slug_for_href_match' ], $group['menus'] );
+			// JS側は a[href]（wp-admin相対）で突合するため、コア同等のhrefに変換して渡す。
+			$menu_slugs = [];
+			foreach ( (array) $group['menus'] as $slug ) {
+				$href        = $this->get_admin_href_from_menu_slug( (string) $slug );
+				$menu_slugs[] = $this->normalize_admin_href_for_matching( $href );
+			}
 			$icon_color   = ! empty( $group['separator']['icon_color'] ) ? $group['separator']['icon_color'] : '';
 
 			$accordion_groups[] = [
@@ -1152,49 +1220,6 @@ tools.php</pre>
 		}
 
 		return ! empty( $accordion_groups ) ? $accordion_groups : null;
-	}
-
-	/**
-	 * メニューslugを、JS側でa[href]と一致しやすいhref形式に寄せる。
-	 *
-	 * - WordPressの $menu の slug は「page値のみ」になるケースがある（例: wp-dbmanager/database-manager.php）
-	 * - DOM側は a[href]="admin.php?page=..." になるため、ここで表記ゆれを吸収する
-	 *
-	 * 重要: 並び替え処理は slug 前提のため、ここで返す値はアコーディオン用途に限定する。
-	 *
-	 * @since 1.2.6
-	 *
-	 * @param string $slug メニューslug（設定内の1行）
-	 * @return string href突合用の文字列
-	 */
-	private function normalize_menu_slug_for_href_match( string $slug ): string {
-		$slug = trim( $slug );
-		if ( '' === $slug ) {
-			return '';
-		}
-
-		// 既にURL形式ならそのまま
-		if ( 0 === strpos( $slug, 'admin.php?page=' ) ) {
-			return $slug;
-		}
-
-		// 例: wp_file_manager のような「page値のみ」→ admin.php?page= を補完
-		$has_php   = strpos( $slug, '.php' ) !== false;
-		$has_q     = strpos( $slug, '?' ) !== false;
-		$has_slash = strpos( $slug, '/' ) !== false;
-
-		// スラッシュ無し（単一スラッグ）の場合は、従来仕様に合わせてURL形式に寄せる
-		if ( ! $has_php && ! $has_q && ! $has_slash ) {
-			return 'admin.php?page=' . $slug;
-		}
-
-		// スラッシュ＋.php（例: wp-dbmanager/database-manager.php）は page 値として扱われることが多い
-		if ( $has_slash && $has_php && ! $has_q ) {
-			return 'admin.php?page=' . $slug;
-		}
-
-		// edit.php?post_type=... 等はそのまま href として扱う
-		return $slug;
 	}
 
 	/**
