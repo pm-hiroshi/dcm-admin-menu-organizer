@@ -178,7 +178,6 @@
 			};
 
 			let isToggling = false;
-
 			if (isCollapsed) {
 				separatorLi.classList.add('dcm-collapsed');
 				menuItems.forEach(item => item.classList.add('dcm-hidden'));
@@ -192,7 +191,6 @@
 					return;
 				}
 				isToggling = true;
-
 				const nowCollapsed = separatorLi.classList.toggle('dcm-collapsed');
 				menuItems.forEach(item => item.classList.toggle('dcm-hidden'));
 
