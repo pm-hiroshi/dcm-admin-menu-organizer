@@ -11,9 +11,32 @@
 	const configHash = data.config_hash || '';
 
 	/**
+	 * `wp-dbmanager/database-manager.php` のように `admin.php?page=` を省略した
+	 * プラグインページスラッグを、メニューhref側と一致する形に補正する。
+	 */
+	function normalizePluginPageSlug(input) {
+		const str = (input || '').trim();
+		if (!str) {
+			return str;
+		}
+		// 既に admin.php?page= 形式ならそのまま
+		if (str.includes('admin.php?page=')) {
+			return str;
+		}
+		// `something/something.php` の形式は多くのプラグインが admin.php?page= の page 値として使う
+		// （クエリが含まれていても page 値として成立するケースがあるため、ここでは過度に絞り込まない）
+		const looksLikePluginPage = str.includes('/') && str.includes('.php') && !str.startsWith('/') && !str.startsWith('http');
+		if (looksLikePluginPage) {
+			return `admin.php?page=${str}`;
+		}
+		return str;
+	}
+
+	/**
 	 * 管理画面内の href を正規化し、/wp-admin/ 以降のパス+クエリをキーとして返す。
 	 */
 	function normalizeAdminHref(href) {
+		href = normalizePluginPageSlug(href);
 		try {
 			const url = new URL(href, window.location.origin);
 			const adminIndex = url.pathname.indexOf('/wp-admin/');
