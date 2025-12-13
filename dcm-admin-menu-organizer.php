@@ -3,7 +3,7 @@
  * Plugin Name: DCM Admin Menu Organizer
  * Plugin URI: 
  * Description: 管理画面の親メニューの表示順を制御し、セパレーターを追加できます。
- * Version: 1.2.5
+ * Version: 1.2.6
  * Author: pm-hiroshi
  * Author URI: 
  * License: GPL v2 or later
@@ -1388,7 +1388,7 @@ tools.php</pre>
 			'dcm-admin-accordion',
 			plugin_dir_url( __FILE__ ) . 'assets/js/dcm-admin-accordion.js',
 			[],
-			'1.2.5',
+			'1.2.6',
 			true
 		);
 
