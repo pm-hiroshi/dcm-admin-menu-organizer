@@ -1413,10 +1413,12 @@ tools.php</pre>
 			return $links;
 		}
 
-		// plugins.php の検索/絞り込み状態を維持したままリセットできるようにする
-		$base_args = $this->get_plugins_list_preserved_query_args();
-		$url       = wp_nonce_url(
-			add_query_arg( array_merge( $base_args, [ 'dcm_amo_reset' => '1' ] ), admin_url( 'plugins.php' ) ),
+		// plugins.php の「現在のURL（検索/絞り込み含む）」をベースにリセットURLを作る（将来のWP側パラメータ追加にも追従）。
+		// REQUEST_URI は /wp-admin/plugins.php?... の形なので site_url() でフルURL化する。
+		$current_url = isset( $_SERVER['REQUEST_URI'] ) ? site_url( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : admin_url( 'plugins.php' );
+		$current_url = remove_query_arg( [ 'dcm_amo_reset', 'dcm_amo_reset_done', '_wpnonce' ], $current_url );
+		$url         = wp_nonce_url(
+			add_query_arg( [ 'dcm_amo_reset' => '1' ], $current_url ),
 			'dcm_amo_reset'
 		);
 
@@ -1456,46 +1458,21 @@ tools.php</pre>
 		$this->cached_groups = null;
 		$this->cached_config = null;
 
-		$base_args = $this->get_plugins_list_preserved_query_args();
+		// リセット後は「元のプラグイン一覧URL（検索/絞り込み含む）」へ戻す（open redirect対策で検証は必須）。
+		$default_redirect = admin_url( 'plugins.php' );
+		$referer          = wp_get_referer();
 
-		wp_safe_redirect(
-			add_query_arg(
-				array_merge( $base_args, [ 'dcm_amo_reset_done' => '1' ] ),
-				admin_url( 'plugins.php' )
-			)
-		);
+		if ( is_string( $referer ) && '' !== $referer ) {
+			$redirect_url = add_query_arg(
+				[ 'dcm_amo_reset_done' => '1' ],
+				remove_query_arg( [ 'dcm_amo_reset', 'dcm_amo_reset_done', '_wpnonce' ], $referer )
+			);
+		} else {
+			$redirect_url = add_query_arg( [ 'dcm_amo_reset_done' => '1' ], $default_redirect );
+		}
+
+		wp_safe_redirect( wp_validate_redirect( $redirect_url, $default_redirect ) );
 		exit;
-	}
-
-	/**
-	 * プラグイン一覧（plugins.php）の検索/絞り込み状態を維持するためのクエリを取得
-	 *
-	 * @since 1.2.6
-	 *
-	 * @return array<string, string> add_query_arg 用の配列
-	 */
-	private function get_plugins_list_preserved_query_args(): array {
-		$args = [];
-
-		// 検索文字列
-		if ( isset( $_GET['s'] ) && is_string( $_GET['s'] ) && '' !== $_GET['s'] ) {
-			$args['s'] = sanitize_text_field( wp_unslash( $_GET['s'] ) );
-		}
-
-		// 絞り込み（有効/無効/更新等）
-		if ( isset( $_GET['plugin_status'] ) && is_string( $_GET['plugin_status'] ) && '' !== $_GET['plugin_status'] ) {
-			$args['plugin_status'] = sanitize_key( wp_unslash( $_GET['plugin_status'] ) );
-		}
-
-		// ページング
-		if ( isset( $_GET['paged'] ) ) {
-			$paged = absint( $_GET['paged'] );
-			if ( $paged > 0 ) {
-				$args['paged'] = (string) $paged;
-			}
-		}
-
-		return $args;
 	}
 
 	/**
