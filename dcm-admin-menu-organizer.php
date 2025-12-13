@@ -1187,166 +1187,24 @@ tools.php</pre>
 			$settings    = get_option( $this->option_name, '' );
 			$config_hash = md5( $settings );
 		}
-		?>
-		<script id="dcm-accordion-script">
-		(function() {
-			// 初期化中はメニューを非表示（FOUCを防ぐ）
-			document.body.classList.add('dcm-accordion-loading');
-			
-			// JSONはそのまま出力してJSオブジェクトとして扱う
-			const accordionGroups = <?php echo $accordion_groups_json; ?>;
-			const storageKey = 'dcm_accordion_state';
-			const configHash = '<?php echo esc_js( $config_hash ); ?>';
-			
-			// localStorage から開閉状態を取得
-			function getAccordionState() {
-				try {
-					const stored = localStorage.getItem(storageKey);
-					if (!stored) {
-						return {};
-					}
-					
-					const data = JSON.parse(stored);
-					
-					// 設定ハッシュが一致しない場合は古いデータなので無視
-					if (data.config_hash !== configHash) {
-						console.info('DCM Accordion: Configuration changed, resetting accordion state');
-						return {};
-					}
-					
-					return data.states || {};
-				} catch (e) {
-					return {};
-				}
-			}
-			
-			// localStorage に開閉状態を保存
-			function saveAccordionState(states) {
-				try {
-					const data = {
-						config_hash: configHash,
-						states: states
-					};
-					localStorage.setItem(storageKey, JSON.stringify(data));
-				} catch (e) {
-					// エラーは無視
-				}
-			}
-			
-			// レイアウト再計算を呼び出してWordPress側のメニューレイアウト崩れを防ぐ
-			const triggerResize = (() => {
-				let resizeId = null;
-				return () => {
-					if (resizeId !== null) {
-						cancelAnimationFrame(resizeId);
-					}
-					resizeId = requestAnimationFrame(() => {
-						window.dispatchEvent(new Event('resize'));
-						resizeId = null;
-					});
-				};
-			})();
-			
-			// アコーディオンを初期化
-			function initAccordion() {
-				const state = getAccordionState();
-				
-				accordionGroups.forEach(function(group) {
-					const separatorId = group.separator_id;
-					const menuSlugs = group.menu_slugs;
-					
-					const separatorLi = document.getElementById(separatorId);
-					if (!separatorLi) {
-						console.warn('DCM Accordion: Separator not found:', separatorId);
-						return;
-					}
-					
-					// セパレーターにクラスを追加
-					separatorLi.classList.add('dcm-accordion-separator');
-					
-					// グループ内のメニュー要素を取得
-					const menuItems = [];
-					menuSlugs.forEach(function(slug) {
-						// 複数の方法でメニュー要素を検索
-						let menuLi = document.querySelector('#adminmenu > li#menu-' + CSS.escape(slug));
-						
-						if (!menuLi) {
-							// post_type などの場合
-							const escapedSlug = slug.replace(/[^\w-]/g, function(c) {
-								return '-' + c.charCodeAt(0);
-							});
-							menuLi = document.querySelector('#adminmenu > li[id*="' + escapedSlug + '"]');
-						}
-						
-						if (!menuLi) {
-							// 部分一致で検索
-							const allMenuItems = document.querySelectorAll('#adminmenu > li');
-							for (let i = 0; i < allMenuItems.length; i++) {
-								const item = allMenuItems[i];
-								const href = item.querySelector('a')?.getAttribute('href');
-								if (href && href.indexOf(slug) !== -1) {
-									menuLi = item;
-									break;
-								}
-							}
-						}
-						
-						if (menuLi) {
-							menuLi.classList.add('dcm-accordion-menu-item');
-							menuLi.dataset.accordionGroup = separatorId;
-							menuItems.push(menuLi);
-						}
-					});
-					
-					if (menuItems.length === 0) {
-						console.warn('DCM Accordion: No menu items found for group:', separatorId);
-						return;
-					}
-					
-					// 初期状態を適用（デフォルトは開）
-					const isCollapsed = state[separatorId] === 'collapsed';
-					if (isCollapsed) {
-						separatorLi.classList.add('dcm-collapsed');
-						menuItems.forEach(function(item) {
-							item.classList.add('dcm-hidden');
-						});
-					}
-					
-					// クリックイベント
-					separatorLi.addEventListener('click', function(e) {
-						e.preventDefault();
-						e.stopPropagation();
-						
-						const nowCollapsed = separatorLi.classList.toggle('dcm-collapsed');
-						
-						menuItems.forEach(function(item) {
-							item.classList.toggle('dcm-hidden');
-						});
-						
-						// メニューDOMの高さが変わるのでWPのレイアウト計算を促す
-						triggerResize();
-						
-						// 状態を保存
-						const newState = getAccordionState();
-						newState[separatorId] = nowCollapsed ? 'collapsed' : 'expanded';
-						saveAccordionState(newState);
-					});
-				});
-				
-				// 初期化完了：メニューを表示
-				document.body.classList.remove('dcm-accordion-loading');
-				triggerResize();
-			}
-			
-			// DOM読み込み後に初期化
-			if (document.readyState === 'loading') {
-				document.addEventListener('DOMContentLoaded', initAccordion);
-			} else {
-				initAccordion();
-			}
-		})();
-		</script>
-		<?php
+		$inline_data = [
+			'groups'      => $accordion_groups,
+			'config_hash' => $config_hash,
+		];
+
+		wp_enqueue_script(
+			'dcm-admin-accordion',
+			plugin_dir_url( __FILE__ ) . 'assets/js/dcm-admin-accordion.js',
+			[],
+			'1.2.5',
+			true
+		);
+
+		wp_add_inline_script(
+			'dcm-admin-accordion',
+			'window.dcmAdminMenuAccordionData = ' . wp_json_encode( $inline_data ) . ';',
+			'before'
+		);
 	}
 
 	/**
