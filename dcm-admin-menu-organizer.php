@@ -608,11 +608,20 @@ tools.php</pre>
 						if ( strpos( $slug, 'separator' ) === 0 ) {
 							continue;
 						}
-						// admin.php?page=xxx のようなプラグインメニューはスラッグだけが入ることがある
-						$has_php  = strpos( $slug, '.php' ) !== false;
-						$has_q    = strpos( $slug, '?' ) !== false;
+						// 可能な限りURL形式に統一（人が認知しやすい形）。
+						// - core: index.php / edit.php?post_type=page 等はそのまま
+						// - plugin: $menuのslugがpage値だけでも、a[href]は admin.php?page=... になりやすいので統一する
+						if ( 0 === strpos( $slug, 'admin.php?' ) || 0 === strpos( $slug, 'admin.php?page=' ) ) {
+							$menu_slugs[] = $slug;
+							continue;
+						}
+
+						$has_php   = strpos( $slug, '.php' ) !== false;
+						$has_q     = strpos( $slug, '?' ) !== false;
 						$has_slash = strpos( $slug, '/' ) !== false;
-						if ( ! $has_php && ! $has_q && ! $has_slash ) {
+
+						// 例: wp_dbmanager/database-manager.php のような page 値（スラッシュ＋.php）も admin.php?page= に寄せる
+						if ( ( ! $has_q && ! $has_php && ! $has_slash ) || ( $has_slash && $has_php && ! $has_q ) ) {
 							$menu_slugs[] = 'admin.php?page=' . $slug;
 						} else {
 							$menu_slugs[] = $slug;
@@ -748,7 +757,7 @@ tools.php</pre>
 					'menus'     => [],
 				];
 			} elseif ( 'menu' === $line['type'] ) {
-				$current_group['menus'][] = $line['slug'];
+				$current_group['menus'][] = $line['value'];
 			}
 		}
 
@@ -975,11 +984,68 @@ tools.php</pre>
 			// 通常のメニュースラッグ
 			$parsed[] = [
 				'type' => 'menu',
-				'slug' => $line,
+				// 設定は人が認知しやすい「URL形式」を許容する（例: admin.php?page=xxx）。
+				// 内部処理（並び替え等）では $menu の slug に正規化して使用する。
+				'value' => $line,
 			];
 		}
 
 		return $parsed;
+	}
+
+	/**
+	 * 設定で入力された値（URL/slug）を、WordPress の $menu で使われる slug に正規化する。
+	 *
+	 * 目的:
+	 * - 設定は「URL形式」で統一できる（人間が認知しやすい）
+	 * - 並び替え/表示判定は「$menu のキー（slug）」で確実に動く
+	 *
+	 * 対応例:
+	 * - admin.php?page=wp-dbmanager/database-manager.php → wp-dbmanager/database-manager.php
+	 * - /wp-admin/admin.php?page=wp_file_manager → wp_file_manager
+	 * - index.php / edit.php?post_type=page → そのまま
+	 *
+	 * @since 1.2.6
+	 *
+	 * @param string $value 設定の1行
+	 * @return string $menu の slug
+	 */
+	private function normalize_menu_value_to_menu_slug( string $value ): string {
+		$value = trim( $value );
+		if ( '' === $value ) {
+			return '';
+		}
+
+		// フルURLの場合は /wp-admin/ 以降に揃える
+		if ( 0 === strpos( $value, 'http://' ) || 0 === strpos( $value, 'https://' ) ) {
+			$path  = (string) wp_parse_url( $value, PHP_URL_PATH );
+			$query = (string) wp_parse_url( $value, PHP_URL_QUERY );
+
+			$wp_admin_pos = strpos( $path, '/wp-admin/' );
+			if ( false !== $wp_admin_pos ) {
+				$path = substr( $path, $wp_admin_pos + strlen( '/wp-admin/' ) );
+			} else {
+				$path = ltrim( $path, '/' );
+			}
+
+			$value = $path . ( '' !== $query ? '?' . $query : '' );
+		}
+
+		// 先頭の / を落として相対パスに
+		$value = ltrim( $value, '/' );
+
+		// admin.php?page=... の場合は page 値が $menu の slug になることが多い
+		if ( 0 === strpos( $value, 'admin.php?' ) ) {
+			$query = (string) wp_parse_url( $value, PHP_URL_QUERY );
+			if ( '' !== $query ) {
+				parse_str( $query, $params );
+				if ( isset( $params['page'] ) && is_string( $params['page'] ) && '' !== $params['page'] ) {
+					return $params['page'];
+				}
+			}
+		}
+
+		return $value;
 	}
 
 	/**
@@ -1021,6 +1087,29 @@ tools.php</pre>
 
 		// グループ構造を構築してフィルタリング
 		$groups = $this->build_menu_groups( $lines );
+
+		// 設定値（URL/slug）を $menu の slug に変換（並び替え/表示判定用）
+		foreach ( $groups as &$group ) {
+			if ( empty( $group['menus'] ) ) {
+				continue;
+			}
+
+			$normalized = [];
+			foreach ( $group['menus'] as $value ) {
+				$slug = $this->normalize_menu_value_to_menu_slug( (string) $value );
+				if ( '' === $slug ) {
+					continue;
+				}
+
+				// 実在するメニューだけ採用（未指定メニューの挙動と整合）
+				if ( isset( $menu_by_slug[ $slug ] ) ) {
+					$normalized[] = $slug;
+				}
+			}
+			$group['menus'] = $normalized;
+		}
+		unset( $group );
+
 		$groups = $this->filter_groups_with_visible_menus( $groups, $menu_by_slug );
 
 		// キャッシュに保存
