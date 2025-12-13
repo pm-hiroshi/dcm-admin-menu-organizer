@@ -145,7 +145,13 @@
 				return;
 			}
 
+			// セパレーターにクラスとARIA属性を付与
 			separatorLi.classList.add('dcm-accordion-separator');
+
+			const isCollapsed = state[separatorId] === 'collapsed';
+			separatorLi.setAttribute('tabindex', '0');
+			separatorLi.setAttribute('role', 'button');
+			separatorLi.setAttribute('aria-expanded', (!isCollapsed).toString());
 
 			const menuItems = [];
 			menuSlugs.forEach(slug => {
@@ -165,13 +171,14 @@
 			}
 
 			const updateState = () => {
-				state[separatorId] = separatorLi.classList.contains('dcm-collapsed') ? 'collapsed' : 'expanded';
+				const expanded = !separatorLi.classList.contains('dcm-collapsed');
+				separatorLi.setAttribute('aria-expanded', expanded.toString());
+				state[separatorId] = expanded ? 'expanded' : 'collapsed';
 				saveAccordionState(state);
 			};
 
 			let isToggling = false;
 
-			const isCollapsed = state[separatorId] === 'collapsed';
 			if (isCollapsed) {
 				separatorLi.classList.add('dcm-collapsed');
 				menuItems.forEach(item => item.classList.add('dcm-hidden'));
@@ -193,7 +200,7 @@
 
 				updateState();
 
-				// 軽いデバウンス
+				// トグルガード（連続クリック防止）
 				requestAnimationFrame(() => { isToggling = false; });
 			};
 
@@ -202,19 +209,6 @@
 				if (e.key === 'Enter' || e.key === ' ') {
 					toggle(e);
 				}
-			});
-			separatorLi.setAttribute('tabindex', '0');
-			separatorLi.setAttribute('role', 'button');
-			separatorLi.setAttribute('aria-expanded', (!isCollapsed).toString());
-
-			// aria-expanded 更新
-			separatorLi.addEventListener('click', () => {
-				const expanded = !separatorLi.classList.contains('dcm-collapsed');
-				separatorLi.setAttribute('aria-expanded', expanded.toString());
-			});
-			separatorLi.addEventListener('keydown', () => {
-				const expanded = !separatorLi.classList.contains('dcm-collapsed');
-				separatorLi.setAttribute('aria-expanded', expanded.toString());
 			});
 		});
 
