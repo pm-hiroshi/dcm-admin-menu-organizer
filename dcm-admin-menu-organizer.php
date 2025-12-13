@@ -677,6 +677,8 @@ tools.php</pre>
 
 		foreach ( $groups as $group ) {
 			$group_id++;
+			$accordion_group_class = '';
+			$is_text_separator     = false;
 
 			// セパレーター（グループがある場合のみ）
 			if ( ! empty( $group['separator'] ) ) {
@@ -699,9 +701,11 @@ tools.php</pre>
 						'read',
 						$id,
 						'',
-						'wp-menu-separator',
+						'wp-menu-separator dcm-accordion-separator',
 						$id,
 					];
+					$is_text_separator          = true;
+					$accordion_group_class      = 'dcm-accordion-group-' . $id;
 				}
 				$new_position++;
 			}
@@ -709,7 +713,15 @@ tools.php</pre>
 			// グループ内のメニュー
 			foreach ( $group['menus'] as $slug ) {
 				if ( isset( $menu_by_slug[ $slug ] ) ) {
-					$new_menu[ $new_position ] = $menu_by_slug[ $slug ]['item'];
+					$item = $menu_by_slug[ $slug ]['item'];
+
+					// アコーディオン対象のメニューにグループ情報をCSSクラスとして付与（JS側の突合を不要にする）
+					if ( $is_text_separator && ! empty( $accordion_group_class ) ) {
+						$existing_classes = isset( $item[4] ) ? (string) $item[4] : '';
+						$item[4]          = trim( $existing_classes . ' dcm-accordion-menu-item ' . $accordion_group_class );
+					}
+
+					$new_menu[ $new_position ] = $item;
 					unset( $menu_by_slug[ $slug ] );
 					$new_position++;
 				}
@@ -1253,8 +1265,12 @@ tools.php</pre>
 	 * @return void
 	 */
 	public function output_accordion_styles(): void {
-		$accordion_groups = $this->get_accordion_groups();
-		if ( null === $accordion_groups ) {
+		if ( ! $this->get_accordion_setting() ) {
+			return;
+		}
+
+		$groups = $this->get_filtered_groups();
+		if ( null === $groups ) {
 			return;
 		}
 
@@ -1289,19 +1305,25 @@ tools.php</pre>
 		}
 		
 		<?php
-		// 各グループのアイコン色を個別に設定
-		foreach ( $accordion_groups as $group ) {
-			if ( ! empty( $group['icon_color'] ) ) {
-				$icon_color = $this->sanitize_color_code( $group['icon_color'] );
-				if ( ! empty( $icon_color ) ) {
-					$separator_id = esc_attr( $group['separator_id'] );
-					echo sprintf(
-						'li#%s.dcm-accordion-separator::before { color: %s !important; }' . "\n\t\t",
-						$separator_id,
-						$icon_color
-					);
-				}
+		// 各グループのアイコン色を個別に設定（separator_textのみ）
+		$group_id = 0;
+		foreach ( $groups as $group ) {
+			$group_id++;
+			if ( empty( $group['separator'] ) || 'separator_text' !== $group['separator']['type'] ) {
+				continue;
 			}
+
+			$icon_color = ! empty( $group['separator']['icon_color'] ) ? $this->sanitize_color_code( $group['separator']['icon_color'] ) : '';
+			if ( empty( $icon_color ) ) {
+				continue;
+			}
+
+			$separator_id = esc_attr( 'separator-group-' . $group_id );
+			echo sprintf(
+				'li#%s.dcm-accordion-separator::before { color: %s !important; }' . "\n\t\t",
+				$separator_id,
+				$icon_color
+			);
 		}
 		?>
 		
@@ -1330,12 +1352,24 @@ tools.php</pre>
 	 * @return void
 	 */
 	public function output_accordion_scripts(): void {
-		$accordion_groups = $this->get_accordion_groups();
-		if ( null === $accordion_groups ) {
+		if ( ! $this->get_accordion_setting() ) {
+			return;
+		}
+		$groups = $this->get_filtered_groups();
+		if ( null === $groups ) {
 			return;
 		}
 
-		$accordion_groups_json = wp_json_encode( $accordion_groups );
+		$has_text_separator = false;
+		foreach ( $groups as $group ) {
+			if ( ! empty( $group['separator'] ) && 'separator_text' === $group['separator']['type'] && ! empty( $group['menus'] ) ) {
+				$has_text_separator = true;
+				break;
+			}
+		}
+		if ( ! $has_text_separator ) {
+			return;
+		}
 		
 		// 設定のハッシュ値を生成（設定が変わったら古いデータを無視するため）
 		// ファイル設定が有効な場合はファイル内容のハッシュを使用
@@ -1347,7 +1381,6 @@ tools.php</pre>
 			$config_hash = md5( $settings );
 		}
 		$inline_data = [
-			'groups'      => $accordion_groups,
 			'config_hash' => $config_hash,
 		];
 

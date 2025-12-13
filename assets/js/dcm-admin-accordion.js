@@ -1,79 +1,19 @@
 (() => {
 	const data = window.dcmAdminMenuAccordionData;
-	if (!data || !Array.isArray(data.groups) || data.groups.length === 0) {
+	const configHash = (data && data.config_hash) ? data.config_hash : '';
+
+	// PHP側でセパレーター・メニューにグループクラスを付与しているため、
+	// JSはDOMからグループ情報を取得する（href突合やgroups配列は不要）。
+	const separators = Array.from(
+		document.querySelectorAll('#adminmenu > li.dcm-accordion-separator[id^="separator-group-"]')
+	);
+	if (separators.length === 0) {
 		return;
 	}
 
 	document.body.classList.add('dcm-accordion-loading');
 
-	const accordionGroups = data.groups;
 	const storageKey = 'dcm_accordion_state';
-	const configHash = data.config_hash || '';
-
-	/**
-	 * 管理画面内の href を正規化し、/wp-admin/ 以降のパス+クエリをキーとして返す。
-	 */
-	function normalizeAdminHref(href) {
-		try {
-			const url = new URL(href, window.location.origin);
-			const adminIndex = url.pathname.indexOf('/wp-admin/');
-			let path;
-			if (adminIndex >= 0) {
-				path = url.pathname.slice(adminIndex + '/wp-admin/'.length);
-			} else {
-				// /wp-admin/が無い場合は警告してフルパスをキーに使う
-				console.warn('DCM Accordion: /wp-admin/ not found in href, using full pathname as key:', href);
-				path = url.pathname.replace(/^\/+/, '');
-			}
-			return (path || '') + (url.search || '');
-		} catch (e) {
-			return (href || '').trim();
-		}
-	}
-
-	/**
-	 * 管理メニュー(li.menu-top)のhrefをキーにしたインデックスを作成。
-	 * hrefが重複する場合は最初を優先し、警告を出す。
-	 */
-	function buildMenuIndex() {
-		const map = new Map();
-		document.querySelectorAll('#adminmenu > li.menu-top').forEach(li => {
-			const link = li.querySelector('a[href]');
-			if (!link) {
-				return;
-			}
-			const key = normalizeAdminHref(link.getAttribute('href'));
-			if (!key) {
-				return;
-			}
-			if (!map.has(key)) {
-				map.set(key, li);
-			} else {
-				const existingLi = map.get(key);
-				const getInfo = el => {
-					if (!el) return '[unknown]';
-					const id = el.id ? `#${el.id}` : '';
-					const text = el.textContent ? el.textContent.trim().replace(/\s+/g, ' ') : '';
-					return `${id} "${text}"`;
-				};
-				console.warn(
-					'DCM Accordion: Duplicate menu href detected, keeping first item',
-					key,
-					'\n  Existing:', getInfo(existingLi),
-					'\n  Duplicate:', getInfo(li)
-				);
-			}
-		});
-		return map;
-	}
-
-	/**
-	 * 設定スラッグを正規化して、メニューインデックスから要素を取得。
-	 */
-	function findMenuItem(slug, menuIndex) {
-		const key = normalizeAdminHref(slug);
-		return menuIndex.get(key) || null;
-	}
 
 	/**
 	 * localStorage から開閉状態を取得。ハッシュ不一致時はリセット。
@@ -133,42 +73,25 @@
 	 */
 	function initAccordion() {
 		let state = getAccordionState();
-		const menuIndex = buildMenuIndex();
+		separators.forEach(separatorLi => {
+			const separatorId = separatorLi.id;
+			const groupClass = 'dcm-accordion-group-' + separatorId;
 
-		accordionGroups.forEach(group => {
-			const separatorId = group.separator_id;
-			const menuSlugs = group.menu_slugs;
-
-			const separatorLi = document.getElementById(separatorId);
-			if (!separatorLi) {
-				console.warn('DCM Accordion: Separator not found:', separatorId);
-				return;
-			}
+			const menuItems = Array.from(document.querySelectorAll('#adminmenu > li.' + groupClass));
 
 			// セパレーターにクラスとARIA属性を付与
-			separatorLi.classList.add('dcm-accordion-separator');
-
 			const isCollapsed = state[separatorId] === 'collapsed';
 			separatorLi.setAttribute('tabindex', '0');
 			separatorLi.setAttribute('role', 'button');
 			separatorLi.setAttribute('aria-expanded', (!isCollapsed).toString());
 
-			const menuItems = [];
-			menuSlugs.forEach(slug => {
-				const menuLi = findMenuItem(slug, menuIndex);
-				if (menuLi) {
-					menuLi.classList.add('dcm-accordion-menu-item');
-					menuLi.dataset.accordionGroup = separatorId;
-					menuItems.push(menuLi);
-				} else {
-					console.warn('DCM Accordion: Menu item not found for slug:', slug, 'in group:', separatorId);
-				}
-			});
-
 			if (menuItems.length === 0) {
 				console.warn('DCM Accordion: No menu items found for group:', separatorId);
 				return;
 			}
+
+			// 後方互換: PHP側で付与済みでも、JS側でもクラスを揃えておく
+			menuItems.forEach(item => item.classList.add('dcm-accordion-menu-item'));
 
 			const updateState = () => {
 				const expanded = !separatorLi.classList.contains('dcm-collapsed');
