@@ -17,15 +17,24 @@
 		try {
 			const url = new URL(href, window.location.origin);
 			const adminIndex = url.pathname.indexOf('/wp-admin/');
-			const path = adminIndex >= 0
-				? url.pathname.slice(adminIndex + '/wp-admin/'.length)
-				: url.pathname.replace(/^\/+/, '');
+			let path;
+			if (adminIndex >= 0) {
+				path = url.pathname.slice(adminIndex + '/wp-admin/'.length);
+			} else {
+				// /wp-admin/が無い場合は警告してフルパスをキーに使う
+				console.warn('DCM Accordion: /wp-admin/ not found in href, using full pathname as key:', href);
+				path = url.pathname.replace(/^\/+/, '');
+			}
 			return (path || '') + (url.search || '');
 		} catch (e) {
 			return (href || '').trim();
 		}
 	}
 
+	/**
+	 * 管理メニュー(li.menu-top)のhrefをキーにしたインデックスを作成。
+	 * hrefが重複する場合は最初を優先し、警告を出す。
+	 */
 	function buildMenuIndex() {
 		const map = new Map();
 		document.querySelectorAll('#adminmenu > li.menu-top').forEach(li => {
@@ -40,17 +49,35 @@
 			if (!map.has(key)) {
 				map.set(key, li);
 			} else {
-				console.warn('DCM Accordion: Duplicate menu href detected, keeping first item', key);
+				const existingLi = map.get(key);
+				const getInfo = el => {
+					if (!el) return '[unknown]';
+					const id = el.id ? `#${el.id}` : '';
+					const text = el.textContent ? el.textContent.trim().replace(/\s+/g, ' ') : '';
+					return `${id} "${text}"`;
+				};
+				console.warn(
+					'DCM Accordion: Duplicate menu href detected, keeping first item',
+					key,
+					'\n  Existing:', getInfo(existingLi),
+					'\n  Duplicate:', getInfo(li)
+				);
 			}
 		});
 		return map;
 	}
 
+	/**
+	 * 設定スラッグを正規化して、メニューインデックスから要素を取得。
+	 */
 	function findMenuItem(slug, menuIndex) {
 		const key = normalizeAdminHref(slug);
 		return menuIndex.get(key) || null;
 	}
 
+	/**
+	 * localStorage から開閉状態を取得。ハッシュ不一致時はリセット。
+	 */
 	function getAccordionState() {
 		try {
 			const stored = localStorage.getItem(storageKey);
@@ -68,6 +95,9 @@
 		}
 	}
 
+	/**
+	 * 開閉状態をlocalStorageへ保存（ハッシュ付き）。
+	 */
 	function saveAccordionState(states) {
 		try {
 			localStorage.setItem(
@@ -102,7 +132,7 @@
 	 * アコーディオン初期化: メニュー索引を作成し、保存状態を適用、クリックで開閉。
 	 */
 	function initAccordion() {
-		const state = getAccordionState();
+		let state = getAccordionState();
 		const menuIndex = buildMenuIndex();
 
 		accordionGroups.forEach(group => {
@@ -125,7 +155,7 @@
 					menuLi.dataset.accordionGroup = separatorId;
 					menuItems.push(menuLi);
 				} else {
-					console.warn('DCM Accordion: Menu item not found for slug:', slug);
+					console.warn('DCM Accordion: Menu item not found for slug:', slug, 'in group:', separatorId);
 				}
 			});
 
@@ -134,24 +164,57 @@
 				return;
 			}
 
+			const updateState = () => {
+				state[separatorId] = separatorLi.classList.contains('dcm-collapsed') ? 'collapsed' : 'expanded';
+				saveAccordionState(state);
+			};
+
+			let isToggling = false;
+
 			const isCollapsed = state[separatorId] === 'collapsed';
 			if (isCollapsed) {
 				separatorLi.classList.add('dcm-collapsed');
 				menuItems.forEach(item => item.classList.add('dcm-hidden'));
 			}
 
-			separatorLi.addEventListener('click', e => {
+			const toggle = e => {
 				e.preventDefault();
 				e.stopPropagation();
+
+				if (isToggling) {
+					return;
+				}
+				isToggling = true;
 
 				const nowCollapsed = separatorLi.classList.toggle('dcm-collapsed');
 				menuItems.forEach(item => item.classList.toggle('dcm-hidden'));
 
 				triggerResize();
 
-				const newState = getAccordionState();
-				newState[separatorId] = nowCollapsed ? 'collapsed' : 'expanded';
-				saveAccordionState(newState);
+				updateState();
+
+				// 軽いデバウンス
+				requestAnimationFrame(() => { isToggling = false; });
+			};
+
+			separatorLi.addEventListener('click', toggle);
+			separatorLi.addEventListener('keydown', e => {
+				if (e.key === 'Enter' || e.key === ' ') {
+					toggle(e);
+				}
+			});
+			separatorLi.setAttribute('tabindex', '0');
+			separatorLi.setAttribute('role', 'button');
+			separatorLi.setAttribute('aria-expanded', (!isCollapsed).toString());
+
+			// aria-expanded 更新
+			separatorLi.addEventListener('click', () => {
+				const expanded = !separatorLi.classList.contains('dcm-collapsed');
+				separatorLi.setAttribute('aria-expanded', expanded.toString());
+			});
+			separatorLi.addEventListener('keydown', () => {
+				const expanded = !separatorLi.classList.contains('dcm-collapsed');
+				separatorLi.setAttribute('aria-expanded', expanded.toString());
 			});
 		});
 
