@@ -1,11 +1,11 @@
 <?php
 /**
  * Plugin Name: DCM Admin Menu Organizer
- * Plugin URI: 
- * Description: 管理画面の親メニューの表示順を制御し、セパレーターを追加できます。
- * Version: 1.2.5
- * Author: pm-hiroshi
- * Author URI: 
+ * Plugin URI: https://example.com
+ * Description: 管理画面の親メニューの表示順を制御し、セパレーターを追加できます
+ * Version: 1.2.3
+ * Author: Your Name
+ * Author URI: https://example.com
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: dcm-admin-menu-organizer
@@ -82,13 +82,6 @@ class DCM_Admin_Menu_Organizer {
 	private string $default_config_file;
 
 	/**
-	 * プラグイン名（通知等で使用）
-	 *
-	 * @var string
-	 */
-	private string $plugin_name;
-
-	/**
 	 * コンストラクタ
 	 *
 	 * WordPress のアクションフックに登録
@@ -98,16 +91,6 @@ class DCM_Admin_Menu_Organizer {
 	public function __construct() {
 		// デフォルトの設定ファイルパスを保存
 		$this->default_config_file = WP_CONTENT_DIR . '/dcm-admin-menu-organizer/settings.json';
-		$plugin_data               = get_file_data(
-			__FILE__,
-			[
-				'Name' => 'Plugin Name',
-			],
-			'plugin'
-		);
-		$this->plugin_name         = ! empty( $plugin_data['Name'] )
-			? $plugin_data['Name']
-			: __CLASS__;
 		
 		/**
 		 * 設定ファイルのパスをフィルターで変更可能にする
@@ -124,11 +107,6 @@ class DCM_Admin_Menu_Organizer {
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_separator_styles' ] );
 		add_action( 'admin_head', [ $this, 'output_accordion_styles' ] );
 		add_action( 'admin_footer', [ $this, 'output_accordion_scripts' ] );
-
-		// プラグイン一覧から設定を初期化できるリンクを追加
-		add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), [ $this, 'add_reset_action_link' ] );
-		add_action( 'admin_init', [ $this, 'handle_reset_action' ] );
-		add_action( 'admin_notices', [ $this, 'render_reset_notice' ] );
 	}
 
 	/**
@@ -455,8 +433,11 @@ class DCM_Admin_Menu_Organizer {
 							<?php if ( ! $is_file_config ) : ?>
 								<p style="margin-top: 10px;">
 									<button type="button" class="button" id="import-current-menu">
-										デフォルト状態のメニュー順序を挿入
+										現在のメニューをインポート
 									</button>
+									<span style="margin-left: 10px; color: #666; font-size: 12px;">
+										※ 現在のメニュー順序をテキストエリアに挿入します
+									</span>
 								</p>
 							<?php endif; ?>
 							
@@ -608,24 +589,15 @@ tools.php</pre>
 						if ( strpos( $slug, 'separator' ) === 0 ) {
 							continue;
 						}
-						// admin.php?page=xxx のようなプラグインメニューはスラッグだけが入ることがある
-						$has_php  = strpos( $slug, '.php' ) !== false;
-						$has_q    = strpos( $slug, '?' ) !== false;
-						$has_slash = strpos( $slug, '/' ) !== false;
-						if ( ! $has_php && ! $has_q && ! $has_slash ) {
-							$menu_slugs[] = 'admin.php?page=' . $slug;
-						} else {
-							$menu_slugs[] = $slug;
-						}
+						$menu_slugs[] = $slug;
 					}
 					$menu_slugs_json = wp_json_encode( $menu_slugs );
 					?>
 					
-					// JSONはエスケープせずにそのままJSオブジェクトとして扱う
-					const menuSlugs = <?php echo $menu_slugs_json; ?>;
-					textarea.value = menuSlugs.join('\n');
+					const menuSlugs = <?php echo esc_js( $menu_slugs_json ); ?>;
+					textarea.value = '# 現在のメニュー順序\n' + menuSlugs.join('\n');
 					
-					alert('メニューを挿入しました！\n必要に応じてseparatorを追加してください。');
+					alert('メニューをインポートしました！\n必要に応じてseparatorを追加してください。');
 				});
 			}
 		});
@@ -659,6 +631,23 @@ tools.php</pre>
 				'position' => $position,
 				'item'     => $item,
 			];
+
+			// admin.php?page=xxx 形式とプレーンslugの両方で引けるようにエイリアスを追加
+			if ( strpos( $slug, 'admin.php?page=' ) === 0 ) {
+				$page_slug = substr( $slug, strlen( 'admin.php?page=' ) );
+				if ( ! empty( $page_slug ) ) {
+					$menu_by_slug[ $page_slug ] = [
+						'position' => $position,
+						'item'     => $item,
+					];
+				}
+			} elseif ( false === strpos( $slug, '.php' ) && false === strpos( $slug, '?' ) && false === strpos( $slug, '/' ) ) {
+				$admin_slug = 'admin.php?page=' . $slug;
+				$menu_by_slug[ $admin_slug ] = [
+					'position' => $position,
+					'item'     => $item,
+				];
+			}
 		}
 
 		// 新しいメニュー配列を構築
@@ -1017,6 +1006,23 @@ tools.php</pre>
 				'position' => $position,
 				'item'     => $item,
 			];
+
+			// admin.php?page=xxx 形式とプレーンslugの両方で引けるようにエイリアスを追加
+			if ( strpos( $slug, 'admin.php?page=' ) === 0 ) {
+				$page_slug = substr( $slug, strlen( 'admin.php?page=' ) );
+				if ( ! empty( $page_slug ) ) {
+					$menu_by_slug[ $page_slug ] = [
+						'position' => $position,
+						'item'     => $item,
+					];
+				}
+			} elseif ( false === strpos( $slug, '.php' ) && false === strpos( $slug, '?' ) && false === strpos( $slug, '/' ) ) {
+				$admin_slug = 'admin.php?page=' . $slug;
+				$menu_by_slug[ $admin_slug ] = [
+					'position' => $position,
+					'item'     => $item,
+				];
+			}
 		}
 
 		// グループ構造を構築してフィルタリング
@@ -1193,8 +1199,7 @@ tools.php</pre>
 			// 初期化中はメニューを非表示（FOUCを防ぐ）
 			document.body.classList.add('dcm-accordion-loading');
 			
-			// JSONはそのまま出力してJSオブジェクトとして扱う
-			const accordionGroups = <?php echo $accordion_groups_json; ?>;
+			const accordionGroups = <?php echo esc_js( $accordion_groups_json ); ?>;
 			const storageKey = 'dcm_accordion_state';
 			const configHash = '<?php echo esc_js( $config_hash ); ?>';
 			
@@ -1233,20 +1238,6 @@ tools.php</pre>
 				}
 			}
 			
-			// レイアウト再計算を呼び出してWordPress側のメニューレイアウト崩れを防ぐ
-			const triggerResize = (() => {
-				let resizeId = null;
-				return () => {
-					if (resizeId !== null) {
-						cancelAnimationFrame(resizeId);
-					}
-					resizeId = requestAnimationFrame(() => {
-						window.dispatchEvent(new Event('resize'));
-						resizeId = null;
-					});
-				};
-			})();
-			
 			// アコーディオンを初期化
 			function initAccordion() {
 				const state = getAccordionState();
@@ -1267,9 +1258,20 @@ tools.php</pre>
 					// グループ内のメニュー要素を取得
 					const menuItems = [];
 					menuSlugs.forEach(function(slug) {
+						// admin.php?page=xxx のようなケース用に page スラッグも計算
+						const pageSlug = slug.startsWith('admin.php?page=') ? slug.split('admin.php?page=').pop() : null;
+
 						// 複数の方法でメニュー要素を検索
 						let menuLi = document.querySelector('#adminmenu > li#menu-' + CSS.escape(slug));
 						
+						if (!menuLi && pageSlug) {
+							menuLi = document.querySelector('#adminmenu > li#toplevel_page_' + CSS.escape(pageSlug));
+						}
+
+						if (!menuLi && pageSlug) {
+							menuLi = document.querySelector('#adminmenu > li#menu-' + CSS.escape(pageSlug));
+						}
+
 						if (!menuLi) {
 							// post_type などの場合
 							const escapedSlug = slug.replace(/[^\w-]/g, function(c) {
@@ -1284,7 +1286,7 @@ tools.php</pre>
 							for (let i = 0; i < allMenuItems.length; i++) {
 								const item = allMenuItems[i];
 								const href = item.querySelector('a')?.getAttribute('href');
-								if (href && href.indexOf(slug) !== -1) {
+								if (href && (href.indexOf(slug) !== -1 || (pageSlug && href.indexOf(pageSlug) !== -1))) {
 									menuLi = item;
 									break;
 								}
@@ -1323,9 +1325,6 @@ tools.php</pre>
 							item.classList.toggle('dcm-hidden');
 						});
 						
-						// メニューDOMの高さが変わるのでWPのレイアウト計算を促す
-						triggerResize();
-						
 						// 状態を保存
 						const newState = getAccordionState();
 						newState[separatorId] = nowCollapsed ? 'collapsed' : 'expanded';
@@ -1335,7 +1334,6 @@ tools.php</pre>
 				
 				// 初期化完了：メニューを表示
 				document.body.classList.remove('dcm-accordion-loading');
-				triggerResize();
 			}
 			
 			// DOM読み込み後に初期化
@@ -1346,94 +1344,6 @@ tools.php</pre>
 			}
 		})();
 		</script>
-		<?php
-	}
-
-	/**
-	 * プラグイン一覧のアクションリンクに「リセット」を追加
-	 *
-	 * @since 1.2.4
-	 *
-	 * @param array<int, string> $links 既存リンク
-	 *
-	 * @return array<int, string> 追記後のリンク
-	 */
-	public function add_reset_action_link( array $links ): array {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			return $links;
-		}
-
-		$url = wp_nonce_url(
-			add_query_arg( 'dcm_amo_reset', '1', admin_url( 'plugins.php' ) ),
-			'dcm_amo_reset'
-		);
-
-		$links[] = sprintf(
-			'<a href="%1$s" onclick="return confirm(\'DBに保存された設定を初期化します。ファイル設定(JSON)は変更されません。よろしいですか？\');">%2$s</a>',
-			esc_url( $url ),
-			esc_html__( 'リセット', 'dcm-admin-menu-organizer' )
-		);
-
-		return $links;
-	}
-
-	/**
-	 * リセットリクエストを処理
-	 *
-	 * @since 1.2.4
-	 *
-	 * @return void
-	 */
-	public function handle_reset_action(): void {
-		if ( ! isset( $_GET['dcm_amo_reset'] ) ) {
-			return;
-		}
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'You do not have permission to reset this setting.', 'dcm-admin-menu-organizer' ) );
-		}
-
-		check_admin_referer( 'dcm_amo_reset' );
-
-		// 設定を初期状態に戻す
-		delete_option( $this->option_name );
-		delete_option( $this->accordion_option_name );
-		delete_option( $this->hide_unspecified_option_name );
-
-		// キャッシュもリセット
-		$this->cached_groups = null;
-		$this->cached_config = null;
-
-		wp_safe_redirect(
-			add_query_arg(
-				'dcm_amo_reset_done',
-				'1',
-				admin_url( 'plugins.php' )
-			)
-		);
-		exit;
-	}
-
-	/**
-	 * リセット完了の管理画面通知を表示
-	 *
-	 * @since 1.2.4
-	 *
-	 * @return void
-	 */
-	public function render_reset_notice(): void {
-		if ( ! isset( $_GET['dcm_amo_reset_done'] ) ) {
-			return;
-		}
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			return;
-		}
-
-		?>
-		<div class="notice notice-success is-dismissible">
-			<p><?php echo esc_html( sprintf( __( '%s の設定を初期化しました。', 'dcm-admin-menu-organizer' ), $this->plugin_name ) ); ?></p>
-		</div>
 		<?php
 	}
 }
