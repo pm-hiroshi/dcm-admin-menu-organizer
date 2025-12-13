@@ -1413,8 +1413,10 @@ tools.php</pre>
 			return $links;
 		}
 
-		$url = wp_nonce_url(
-			add_query_arg( 'dcm_amo_reset', '1', admin_url( 'plugins.php' ) ),
+		// plugins.php の検索/絞り込み状態を維持したままリセットできるようにする
+		$base_args = $this->get_plugins_list_preserved_query_args();
+		$url       = wp_nonce_url(
+			add_query_arg( array_merge( $base_args, [ 'dcm_amo_reset' => '1' ] ), admin_url( 'plugins.php' ) ),
 			'dcm_amo_reset'
 		);
 
@@ -1454,14 +1456,46 @@ tools.php</pre>
 		$this->cached_groups = null;
 		$this->cached_config = null;
 
+		$base_args = $this->get_plugins_list_preserved_query_args();
+
 		wp_safe_redirect(
 			add_query_arg(
-				'dcm_amo_reset_done',
-				'1',
+				array_merge( $base_args, [ 'dcm_amo_reset_done' => '1' ] ),
 				admin_url( 'plugins.php' )
 			)
 		);
 		exit;
+	}
+
+	/**
+	 * プラグイン一覧（plugins.php）の検索/絞り込み状態を維持するためのクエリを取得
+	 *
+	 * @since 1.2.6
+	 *
+	 * @return array<string, string> add_query_arg 用の配列
+	 */
+	private function get_plugins_list_preserved_query_args(): array {
+		$args = [];
+
+		// 検索文字列
+		if ( isset( $_GET['s'] ) && is_string( $_GET['s'] ) && '' !== $_GET['s'] ) {
+			$args['s'] = sanitize_text_field( wp_unslash( $_GET['s'] ) );
+		}
+
+		// 絞り込み（有効/無効/更新等）
+		if ( isset( $_GET['plugin_status'] ) && is_string( $_GET['plugin_status'] ) && '' !== $_GET['plugin_status'] ) {
+			$args['plugin_status'] = sanitize_key( wp_unslash( $_GET['plugin_status'] ) );
+		}
+
+		// ページング
+		if ( isset( $_GET['paged'] ) ) {
+			$paged = absint( $_GET['paged'] );
+			if ( $paged > 0 ) {
+				$args['paged'] = (string) $paged;
+			}
+		}
+
+		return $args;
 	}
 
 	/**

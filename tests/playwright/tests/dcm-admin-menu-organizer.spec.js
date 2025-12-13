@@ -40,9 +40,10 @@ test('管理メニュー並び替え: 主要フロー', async ({ page, baseURL }
     // settingsページへ行き、ログイン画面ならログインして戻る
     await page.goto(settingsPath);
     if (page.url().includes('/wp-login.php')) {
-      await page.getByRole('textbox', { name: 'ユーザー名またはメールアドレス' }).fill(user);
-      await page.getByRole('textbox', { name: 'パスワード' }).fill(pass);
-      await page.getByRole('button', { name: 'ログイン' }).click();
+      // WordPressのログインフォームは文言/言語で揺れるので、idで確実に埋める
+      await page.locator('#user_login').fill(user);
+      await page.locator('#user_pass').fill(pass);
+      await page.locator('#wp-submit').click();
       // ログイン成功なら wp-admin 側へ遷移するはず。失敗時はエラー表示のまま。
       try {
         await page.waitForURL(/\/wp-admin\//, { timeout: 30_000 });
