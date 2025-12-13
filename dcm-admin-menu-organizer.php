@@ -1,11 +1,11 @@
 <?php
 /**
  * Plugin Name: DCM Admin Menu Organizer
- * Plugin URI: https://example.com
- * Description: 管理画面の親メニューの表示順を制御し、セパレーターを追加できます
+ * Plugin URI: 
+ * Description: 管理画面の親メニューの表示順を制御し、セパレーターを追加できます。
  * Version: 1.2.5
- * Author: Your Name
- * Author URI: https://example.com
+ * Author: pm-hiroshi
+ * Author URI: 
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: dcm-admin-menu-organizer
