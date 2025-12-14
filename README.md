@@ -418,15 +418,12 @@ add_filter( 'dcm_admin_menu_organizer_config_file', function( $config_file ) {
 
 設定は WordPress の `wp_options` テーブルに保存されます。
 
-- **オプション名**: `dcm_admin_menu_order`
-  - **データ型**: `TEXT`
-  - **保存形式**: プレーンテキスト（改行区切り）
-- **オプション名**: `dcm_admin_menu_accordion_enabled`
-  - **データ型**: `BOOLEAN`
-  - **保存形式**: `0` (無効) または `1` (有効)
-- **オプション名**: `dcm_admin_menu_hide_unspecified`
-  - **データ型**: `BOOLEAN`
-  - **保存形式**: `0` (無効) または `1` (有効)
+- **オプション名**: `dcm_admin_menu_organizer_settings`
+  - **データ型**: `ARRAY`
+  - **保存形式**: 連想配列（以下のキー）
+    - `menu_order` (string): プレーンテキスト（改行区切り）
+    - `accordion_enabled` (bool)
+    - `hide_unspecified` (bool)
 
 ## ライセンス
 
