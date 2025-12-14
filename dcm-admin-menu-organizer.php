@@ -3,7 +3,7 @@
  * Plugin Name: DCM Admin Menu Organizer
  * Plugin URI: 
  * Description: 管理画面の親メニューの表示順を制御し、セパレーターを追加できます。
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: pm-hiroshi
  * Author URI: 
  * License: GPL v2 or later
@@ -681,6 +681,19 @@ tools.php</pre>
 			return;
 		}
 
+		// 現在地のトップレベルメニュー（WP標準の判定結果）を使ってロック対象グループを決める。
+		// REQUEST_URI は /wp-admin/ と index.php の揺れ等があるため避ける。
+		$current_top_slug = '';
+		if ( function_exists( 'get_admin_page_parent' ) ) {
+			$parent = get_admin_page_parent();
+			if ( is_string( $parent ) ) {
+				$current_top_slug = $parent;
+			}
+		}
+		if ( '' === $current_top_slug && isset( $GLOBALS['parent_file'] ) && is_string( $GLOBALS['parent_file'] ) ) {
+			$current_top_slug = (string) $GLOBALS['parent_file'];
+		}
+
 		// 現在のメニューをスラッグでインデックス化（メニュー再構築に必要）
 		$menu_by_slug = [];
 		foreach ( $menu as $position => $item ) {
@@ -717,12 +730,18 @@ tools.php</pre>
 				} elseif ( 'separator_text' === $sep['type'] ) {
 					// テキスト付きセパレーター
 					$id                         = 'separator-group-' . $group_id;
+					$locked_class               = '';
+					if ( '' !== $current_top_slug && ! empty( $group['menus'] ) ) {
+						if ( in_array( $current_top_slug, (array) $group['menus'], true ) ) {
+							$locked_class = ' dcm-accordion-locked';
+						}
+					}
 					$new_menu[ $new_position ] = [
 						'',
 						'read',
 						$id,
 						'',
-						'wp-menu-separator dcm-accordion-separator',
+						'wp-menu-separator dcm-accordion-separator' . $locked_class,
 						$id,
 					];
 					$is_text_separator          = true;
@@ -1418,7 +1437,7 @@ tools.php</pre>
 			'dcm-admin-accordion',
 			plugin_dir_url( __FILE__ ) . 'assets/js/dcm-admin-accordion.js',
 			[],
-			'1.0.0',
+			'1.0.1',
 			true
 		);
 

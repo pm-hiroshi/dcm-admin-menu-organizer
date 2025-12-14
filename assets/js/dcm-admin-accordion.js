@@ -73,23 +73,16 @@
 	 */
 	function initAccordion() {
 		let state = getAccordionState();
+
 		separators.forEach(separatorLi => {
 			const separatorId = separatorLi.id;
 			const groupClass = 'dcm-accordion-group-' + separatorId;
 
 			const menuItems = Array.from(document.querySelectorAll('#adminmenu > li.' + groupClass));
 
-			const isCurrentGroup = menuItems.some((item) => {
-				return (
-					item.classList.contains('current') ||
-					item.classList.contains('wp-has-current-submenu') ||
-					!!item.querySelector('.current') ||
-					!!item.querySelector('.wp-has-current-submenu')
-				);
-			});
-
-			// 現在地を含むグループは閉じられない（UX破綻防止）
-			if (isCurrentGroup) {
+			// PHP側で現在地グループのセパレーターにロッククラスを付与しているため、
+			// JS側はロッククラスの有無だけを見て「閉じられない」ようにする。
+			if (separatorLi.classList.contains('dcm-accordion-locked')) {
 				separatorLi.classList.add('dcm-accordion-locked');
 				separatorLi.classList.remove('dcm-collapsed');
 				menuItems.forEach((item) => item.classList.remove('dcm-hidden'));
