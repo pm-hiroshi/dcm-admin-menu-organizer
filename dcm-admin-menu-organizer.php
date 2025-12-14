@@ -3,7 +3,7 @@
  * Plugin Name: DCM Admin Menu Organizer
  * Plugin URI: 
  * Description: 管理画面の親メニューの表示順を制御し、セパレーターを追加できます。
- * Version: 1.2.6
+ * Version: 1.2.7
  * Author: pm-hiroshi
  * Author URI: 
  * License: GPL v2 or later
@@ -26,25 +26,39 @@ if ( ! defined( 'ABSPATH' ) ) {
 class DCM_Admin_Menu_Organizer {
 
 	/**
-	 * オプション名
+	 * レガシー: メニュー順序のオプション名（後方互換用）
 	 *
 	 * @var string
 	 */
 	private string $option_name = 'dcm_admin_menu_order';
 
 	/**
-	 * アコーディオン機能の有効/無効オプション名
+	 * レガシー: アコーディオン機能の有効/無効オプション名（後方互換用）
 	 *
 	 * @var string
 	 */
 	private string $accordion_option_name = 'dcm_admin_menu_accordion_enabled';
 
 	/**
-	 * 未指定メニューを非表示にするオプション名
+	 * レガシー: 未指定メニューを非表示にするオプション名（後方互換用）
 	 *
 	 * @var string
 	 */
 	private string $hide_unspecified_option_name = 'dcm_admin_menu_hide_unspecified';
+
+	/**
+	 * 統合設定（DB）のオプション名
+	 *
+	 * settings.json と同じキー構造で保存する:
+	 * - menu_order (string)
+	 * - accordion_enabled (bool)
+	 * - hide_unspecified (bool)
+	 *
+	 * @since 1.2.7
+	 *
+	 * @var string
+	 */
+	private string $settings_option_name = 'dcm_admin_menu_organizer_settings';
 
 	/**
 	 * 設定ページスラッグ
@@ -156,73 +170,118 @@ class DCM_Admin_Menu_Organizer {
 	 * @return void
 	 */
 	public function register_settings(): void {
-		register_setting(
-			'dcm_menu_organizer_group',
-			$this->option_name,
-			[
-				'type'              => 'string',
-				'sanitize_callback' => [ $this, 'sanitize_menu_order' ],
-				'default'           => '',
-			]
-		);
+		$this->maybe_migrate_legacy_options();
 
 		register_setting(
 			'dcm_menu_organizer_group',
-			$this->accordion_option_name,
+			$this->settings_option_name,
 			[
-				'type'              => 'boolean',
-				'sanitize_callback' => [ $this, 'sanitize_boolean_option' ],
-				'default'           => false,
-			]
-		);
-
-		register_setting(
-			'dcm_menu_organizer_group',
-			$this->hide_unspecified_option_name,
-			[
-				'type'              => 'boolean',
-				'sanitize_callback' => [ $this, 'sanitize_boolean_option' ],
-				'default'           => false,
+				'type'              => 'array',
+				'sanitize_callback' => [ $this, 'sanitize_settings' ],
+				'default'           => $this->get_default_db_settings(),
 			]
 		);
 	}
 
 	/**
-	 * 設定値をサニタイズ
+	 * 統合設定（DB）をサニタイズ
 	 *
-	 * @since 1.0.0
-	 *
-	 * @param string $input 入力値
-	 *
-	 * @return string サニタイズされた文字列
-	 */
-	public function sanitize_menu_order( string $input ): string {
-		// 権限チェック（明示的なセキュリティ対策）
-		if ( ! current_user_can( 'manage_options' ) ) {
-			return get_option( $this->option_name, '' );
-		}
-
-		return sanitize_textarea_field( $input );
-	}
-
-	/**
-	 * 真偽値オプション（アコーディオン/未指定メニュー非表示）をサニタイズ
-	 *
-	 * @since 1.2.0
+	 * @since 1.2.7
 	 *
 	 * @param mixed $input 入力値
 	 *
-	 * @return bool サニタイズされた真偽値
+	 * @return array<string, mixed> サニタイズされた配列
 	 */
-	public function sanitize_boolean_option( $input ): bool {
+	public function sanitize_settings( $input ): array {
 		// 権限チェック（明示的なセキュリティ対策）
 		if ( ! current_user_can( 'manage_options' ) ) {
-			// 現在の値を返す（変更を拒否）
-			$option_name = isset( $_POST[ $this->accordion_option_name ] ) ? $this->accordion_option_name : $this->hide_unspecified_option_name;
-			return (bool) get_option( $option_name, false );
+			$current = get_option( $this->settings_option_name, [] );
+			return is_array( $current ) ? $current : $this->get_default_db_settings();
 		}
 
-		return (bool) $input;
+		$defaults = $this->get_default_db_settings();
+		$input    = is_array( $input ) ? $input : [];
+
+		$menu_order = isset( $input['menu_order'] ) ? (string) $input['menu_order'] : '';
+
+		return [
+			'menu_order'        => sanitize_textarea_field( $menu_order ),
+			'accordion_enabled' => ! empty( $input['accordion_enabled'] ),
+			'hide_unspecified'  => ! empty( $input['hide_unspecified'] ),
+		] + $defaults;
+	}
+
+	/**
+	 * 統合設定（DB）のデフォルト値
+	 *
+	 * @since 1.2.7
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function get_default_db_settings(): array {
+		return [
+			'menu_order'        => '',
+			'accordion_enabled' => false,
+			'hide_unspecified'  => false,
+		];
+	}
+
+	/**
+	 * 統合設定（DB）を取得（後方互換: 旧3オプションからの移行/読み取り）
+	 *
+	 * @since 1.2.7
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function get_db_settings(): array {
+		$defaults = $this->get_default_db_settings();
+		$current  = get_option( $this->settings_option_name, null );
+
+		if ( is_array( $current ) ) {
+			return $current + $defaults;
+		}
+
+		// まだ統合設定がない場合は、旧オプションから読み取る（後方互換）。
+		return [
+			'menu_order'        => (string) get_option( $this->option_name, '' ),
+			'accordion_enabled' => (bool) get_option( $this->accordion_option_name, false ),
+			'hide_unspecified'  => (bool) get_option( $this->hide_unspecified_option_name, false ),
+		] + $defaults;
+	}
+
+	/**
+	 * レガシーオプションを統合設定へ移行（1回だけ）
+	 *
+	 * @since 1.2.7
+	 *
+	 * @return void
+	 */
+	private function maybe_migrate_legacy_options(): void {
+		$existing = get_option( $this->settings_option_name, null );
+		if ( is_array( $existing ) ) {
+			return;
+		}
+
+		$sentinel      = '__dcm_amo_not_set__';
+		$legacy_menu   = get_option( $this->option_name, $sentinel );
+		$legacy_acc    = get_option( $this->accordion_option_name, $sentinel );
+		$legacy_hide   = get_option( $this->hide_unspecified_option_name, $sentinel );
+		$has_any_legacy = ( $legacy_menu !== $sentinel ) || ( $legacy_acc !== $sentinel ) || ( $legacy_hide !== $sentinel );
+
+		if ( ! $has_any_legacy ) {
+			return;
+		}
+
+		$settings = [
+			'menu_order'        => is_string( $legacy_menu ) ? $legacy_menu : '',
+			'accordion_enabled' => (bool) $legacy_acc,
+			'hide_unspecified'  => (bool) $legacy_hide,
+		] + $this->get_default_db_settings();
+
+		update_option( $this->settings_option_name, $settings );
+		delete_option( $this->option_name );
+		delete_option( $this->accordion_option_name );
+		delete_option( $this->hide_unspecified_option_name );
 	}
 
 	/**
@@ -359,7 +418,8 @@ class DCM_Admin_Menu_Organizer {
 		}
 
 		// ファイル設定がない場合はDBから取得
-		return get_option( $this->option_name, '' );
+		$settings = $this->get_db_settings();
+		return isset( $settings['menu_order'] ) ? (string) $settings['menu_order'] : '';
 	}
 
 	/**
@@ -377,7 +437,8 @@ class DCM_Admin_Menu_Organizer {
 		}
 
 		// ファイル設定がない場合はDBから取得
-		return (bool) get_option( $this->accordion_option_name, false );
+		$settings = $this->get_db_settings();
+		return ! empty( $settings['accordion_enabled'] );
 	}
 
 	/**
@@ -395,7 +456,8 @@ class DCM_Admin_Menu_Organizer {
 		}
 
 		// ファイル設定がない場合はDBから取得
-		return (bool) get_option( $this->hide_unspecified_option_name, false );
+		$settings = $this->get_db_settings();
+		return ! empty( $settings['hide_unspecified'] );
 	}
 
 	/**
@@ -411,9 +473,10 @@ class DCM_Admin_Menu_Organizer {
 		}
 
 		$is_file_config      = $this->is_file_config_active();
-		$current_value       = $is_file_config ? $this->get_menu_order_setting() : get_option( $this->option_name, '' );
-		$accordion_enabled   = $is_file_config ? $this->get_accordion_setting() : (bool) get_option( $this->accordion_option_name, false );
-		$hide_unspecified    = $is_file_config ? $this->get_hide_unspecified_setting() : (bool) get_option( $this->hide_unspecified_option_name, false );
+		$db_settings         = $this->get_db_settings();
+		$current_value       = $is_file_config ? $this->get_menu_order_setting() : (string) $db_settings['menu_order'];
+		$accordion_enabled   = $is_file_config ? $this->get_accordion_setting() : (bool) $db_settings['accordion_enabled'];
+		$hide_unspecified    = $is_file_config ? $this->get_hide_unspecified_setting() : (bool) $db_settings['hide_unspecified'];
 		?>
 		<div class="wrap">
 			<h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
@@ -444,7 +507,7 @@ class DCM_Admin_Menu_Organizer {
 						</th>
 						<td>
 							<textarea 
-								name="<?php echo esc_attr( $this->option_name ); ?>" 
+								name="<?php echo esc_attr( $this->settings_option_name ); ?>[menu_order]" 
 								id="<?php echo esc_attr( $this->option_name ); ?>"
 								rows="20" 
 								cols="80"
@@ -512,7 +575,7 @@ tools.php</pre>
 						<label>
 							<input 
 								type="checkbox" 
-								name="<?php echo esc_attr( $this->accordion_option_name ); ?>" 
+								name="<?php echo esc_attr( $this->settings_option_name ); ?>[accordion_enabled]" 
 								id="<?php echo esc_attr( $this->accordion_option_name ); ?>"
 								value="1"
 								<?php checked( $accordion_enabled, true ); ?>
@@ -559,7 +622,7 @@ tools.php</pre>
 						<label>
 							<input 
 								type="checkbox" 
-								name="<?php echo esc_attr( $this->hide_unspecified_option_name ); ?>" 
+								name="<?php echo esc_attr( $this->settings_option_name ); ?>[hide_unspecified]" 
 								id="<?php echo esc_attr( $this->hide_unspecified_option_name ); ?>"
 								value="1"
 								<?php checked( $hide_unspecified, true ); ?>
@@ -1377,8 +1440,8 @@ tools.php</pre>
 		if ( null !== $config ) {
 			$config_hash = md5( wp_json_encode( $config ) );
 		} else {
-			$settings    = get_option( $this->option_name, '' );
-			$config_hash = md5( $settings );
+			$db_settings = $this->get_db_settings();
+			$config_hash = md5( wp_json_encode( $db_settings ) );
 		}
 		$inline_data = [
 			'config_hash' => $config_hash,
@@ -1388,7 +1451,7 @@ tools.php</pre>
 			'dcm-admin-accordion',
 			plugin_dir_url( __FILE__ ) . 'assets/js/dcm-admin-accordion.js',
 			[],
-			'1.2.6',
+			'1.2.7',
 			true
 		);
 
@@ -1464,6 +1527,7 @@ tools.php</pre>
 		delete_option( $this->option_name );
 		delete_option( $this->accordion_option_name );
 		delete_option( $this->hide_unspecified_option_name );
+		delete_option( $this->settings_option_name );
 
 		// キャッシュもリセット
 		$this->cached_groups = null;
