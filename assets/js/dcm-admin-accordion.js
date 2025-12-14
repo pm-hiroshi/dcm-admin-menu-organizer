@@ -69,7 +69,7 @@
 	})();
 
 	/**
-	 * アコーディオン初期化: メニュー索引を作成し、保存状態を適用、クリックで開閉。
+	 * アコーディオン初期化: 保存状態を適用、クリックで開閉。
 	 */
 	function initAccordion() {
 		let state = getAccordionState();
@@ -78,6 +78,31 @@
 			const groupClass = 'dcm-accordion-group-' + separatorId;
 
 			const menuItems = Array.from(document.querySelectorAll('#adminmenu > li.' + groupClass));
+
+			const isCurrentGroup = menuItems.some((item) => {
+				return (
+					item.classList.contains('current') ||
+					item.classList.contains('wp-has-current-submenu') ||
+					!!item.querySelector('.current') ||
+					!!item.querySelector('.wp-has-current-submenu')
+				);
+			});
+
+			// 現在地を含むグループは閉じられない（UX破綻防止）
+			if (isCurrentGroup) {
+				separatorLi.classList.add('dcm-accordion-locked');
+				separatorLi.classList.remove('dcm-collapsed');
+				menuItems.forEach((item) => item.classList.remove('dcm-hidden'));
+
+				separatorLi.setAttribute('aria-expanded', 'true');
+				separatorLi.setAttribute('aria-disabled', 'true');
+				separatorLi.removeAttribute('tabindex');
+				separatorLi.removeAttribute('role');
+
+				state[separatorId] = 'expanded';
+				saveAccordionState(state);
+				return;
+			}
 
 			// セパレーターにクラスとARIA属性を付与
 			const isCollapsed = state[separatorId] === 'collapsed';
@@ -101,6 +126,7 @@
 			};
 
 			let isToggling = false;
+
 			if (isCollapsed) {
 				separatorLi.classList.add('dcm-collapsed');
 				menuItems.forEach(item => item.classList.add('dcm-hidden'));
@@ -110,10 +136,15 @@
 				e.preventDefault();
 				e.stopPropagation();
 
+				if (separatorLi.classList.contains('dcm-accordion-locked')) {
+					return;
+				}
+
 				if (isToggling) {
 					return;
 				}
 				isToggling = true;
+
 				const nowCollapsed = separatorLi.classList.toggle('dcm-collapsed');
 				menuItems.forEach(item => item.classList.toggle('dcm-hidden'));
 

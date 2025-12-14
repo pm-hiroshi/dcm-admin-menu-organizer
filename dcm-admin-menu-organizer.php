@@ -54,7 +54,7 @@ class DCM_Admin_Menu_Organizer {
 	 * - accordion_enabled (bool)
 	 * - hide_unspecified (bool)
 	 *
-	 * @since 1.2.7
+	 * @since 1.0.0
 	 *
 	 * @var string
 	 */
@@ -126,7 +126,7 @@ class DCM_Admin_Menu_Organizer {
 		/**
 		 * 設定ファイルのパスをフィルターで変更可能にする
 		 *
-		 * @since 1.2.0
+		 * @since 1.0.0
 		 *
 		 * @param string $config_file 設定ファイルのフルパス
 		 */
@@ -184,7 +184,7 @@ class DCM_Admin_Menu_Organizer {
 	/**
 	 * 統合設定（DB）をサニタイズ
 	 *
-	 * @since 1.2.7
+	 * @since 1.0.0
 	 *
 	 * @param mixed $input 入力値
 	 *
@@ -212,7 +212,7 @@ class DCM_Admin_Menu_Organizer {
 	/**
 	 * 統合設定（DB）のデフォルト値
 	 *
-	 * @since 1.2.7
+	 * @since 1.0.0
 	 *
 	 * @return array<string, mixed>
 	 */
@@ -227,7 +227,7 @@ class DCM_Admin_Menu_Organizer {
 	/**
 	 * 統合設定（DB）を取得（後方互換: 旧3オプションからの移行/読み取り）
 	 *
-	 * @since 1.2.7
+	 * @since 1.0.0
 	 *
 	 * @return array<string, mixed>
 	 */
@@ -247,7 +247,7 @@ class DCM_Admin_Menu_Organizer {
 	 *
 	 * パスの妥当性（セキュリティ）、ファイルの存在、読み取り可能性の両方をチェックします。
 	 *
-	 * @since 1.2.2
+	 * @since 1.0.0
 	 *
 	 * @param string $path 検証するファイルパス
 	 *
@@ -297,7 +297,7 @@ class DCM_Admin_Menu_Organizer {
 	/**
 	 * JSON設定ファイルから設定を読み込む（キャッシュ機能付き）
 	 *
-	 * @since 1.2.0
+	 * @since 1.0.0
 	 *
 	 * @return array<string, mixed>|null 設定配列、または null（ファイルなし・エラー時）
 	 */
@@ -352,7 +352,7 @@ class DCM_Admin_Menu_Organizer {
 	/**
 	 * ファイル設定が有効かどうかをチェック
 	 *
-	 * @since 1.2.0
+	 * @since 1.0.0
 	 *
 	 * @return bool ファイル設定が有効な場合は true
 	 */
@@ -363,7 +363,7 @@ class DCM_Admin_Menu_Organizer {
 	/**
 	 * メニュー順序の設定を取得（ファイル優先）
 	 *
-	 * @since 1.2.0
+	 * @since 1.0.0
 	 *
 	 * @return string メニュー順序の文字列
 	 */
@@ -383,7 +383,7 @@ class DCM_Admin_Menu_Organizer {
 	/**
 	 * アコーディオン設定を取得（ファイル優先）
 	 *
-	 * @since 1.2.0
+	 * @since 1.0.0
 	 *
 	 * @return bool アコーディオンが有効な場合は true
 	 */
@@ -402,7 +402,7 @@ class DCM_Admin_Menu_Organizer {
 	/**
 	 * 未指定メニュー非表示設定を取得（ファイル優先）
 	 *
-	 * @since 1.2.2
+	 * @since 1.0.0
 	 *
 	 * @return bool 未指定メニューを非表示にする場合は true
 	 */
@@ -764,7 +764,7 @@ tools.php</pre>
 	/**
 	 * パース結果をグループ構造に変換
 	 *
-	 * @since 1.1.0
+	 * @since 1.0.0
 	 *
 	 * @param array<int, array<string, string>> $lines パース済みの行
 	 *
@@ -805,7 +805,7 @@ tools.php</pre>
 	/**
 	 * 表示可能なメニューがあるグループのみをフィルタリング
 	 *
-	 * @since 1.1.0
+	 * @since 1.0.0
 	 *
 	 * @param array<int, array<string, mixed>> $groups         グループ構造
 	 * @param array<string, array<string, mixed>> $menu_by_slug メニュー配列
@@ -1035,7 +1035,7 @@ tools.php</pre>
 	 * - wp_file_manager → admin.php?page=wp_file_manager（後方互換）
 	 * - wp-dbmanager/database-manager.php → admin.php?page=wp-dbmanager/database-manager.php（後方互換）
 	 *
-	 * @since 1.2.6
+	 * @since 1.0.0
 	 *
 	 * @param string $value 設定の1行、またはhref相当
 	 * @return string 正規化済みの相対パス+クエリ
@@ -1085,7 +1085,7 @@ tools.php</pre>
 	/**
 	 * WordPressコア（wp-admin/menu-header.php）の判定に合わせて、menu_slug から href を生成する。
 	 *
-	 * @since 1.2.6
+	 * @since 1.0.0
 	 *
 	 * @param string $menu_slug $menu[*][2] の値
 	 * @return string href相当（wp-admin相対）
@@ -1112,7 +1112,7 @@ tools.php</pre>
 	 *
 	 * 変換とマッチングをこの1箇所に閉じ込めるためのメソッド。
 	 *
-	 * @since 1.2.6
+	 * @since 1.0.0
 	 *
 	 * @param array<int, array<string, mixed>> $groups グループ構造（menusは設定値の配列）
 	 * @param array<string, array<string, mixed>> $menu_by_slug $menu をslugで引ける配列
@@ -1168,7 +1168,7 @@ tools.php</pre>
 	/**
 	 * フィルタリング済みのグループ情報を取得（キャッシュ機能付き）
 	 *
-	 * @since 1.2.0
+	 * @since 1.0.0
 	 *
 	 * @return array<int, array<string, mixed>>|null グループ情報の配列、または null
 	 */
@@ -1219,7 +1219,7 @@ tools.php</pre>
 	/**
 	 * フィルタリング済みグループからアコーディオン用データを構築
 	 *
-	 * @since 1.2.0
+	 * @since 1.0.0
 	 *
 	 * @param array<int, array<string, mixed>> $groups フィルタリング済みグループ
 	 *
@@ -1258,7 +1258,7 @@ tools.php</pre>
 	/**
 	 * アコーディオン用のグループ情報を取得
 	 *
-	 * @since 1.2.0
+	 * @since 1.0.0
 	 *
 	 * @return array<int, array<string, mixed>>|null グループ情報の配列、または null
 	 */
@@ -1281,7 +1281,7 @@ tools.php</pre>
 	/**
 	 * アコーディオン機能のCSSを出力
 	 *
-	 * @since 1.2.0
+	 * @since 1.0.0
 	 *
 	 * @return void
 	 */
@@ -1303,8 +1303,17 @@ tools.php</pre>
 			position: relative;
 		}
 		
-		.dcm-accordion-separator:hover::after {
+		.dcm-accordion-separator:not(.dcm-accordion-locked):hover::after {
 			opacity: 0.8;
+		}
+		
+		/* 現在地を含むグループは閉じられない（クリック不可） */
+		.dcm-accordion-separator.dcm-accordion-locked {
+			cursor: default !important;
+		}
+		
+		.dcm-accordion-separator.dcm-accordion-locked::before {
+			display: none;
 		}
 		
 		/* アコーディオン: 開閉アイコン（デフォルト） */
@@ -1368,7 +1377,7 @@ tools.php</pre>
 	/**
 	 * アコーディオン機能のJavaScriptを出力
 	 *
-	 * @since 1.2.0
+	 * @since 1.0.0
 	 *
 	 * @return void
 	 */
@@ -1423,7 +1432,7 @@ tools.php</pre>
 	/**
 	 * プラグイン一覧のアクションリンクに「リセット」を追加
 	 *
-	 * @since 1.2.4
+	 * @since 1.0.0
 	 *
 	 * @param array<int, string> $links 既存リンク
 	 *
@@ -1466,7 +1475,7 @@ tools.php</pre>
 	/**
 	 * リセットリクエストを処理
 	 *
-	 * @since 1.2.4
+	 * @since 1.0.0
 	 *
 	 * @return void
 	 */
@@ -1508,7 +1517,7 @@ tools.php</pre>
 	/**
 	 * リセット完了の管理画面通知を表示
 	 *
-	 * @since 1.2.4
+	 * @since 1.0.0
 	 *
 	 * @return void
 	 */
