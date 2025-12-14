@@ -26,25 +26,25 @@ if ( ! defined( 'ABSPATH' ) ) {
 class DCM_Admin_Menu_Organizer {
 
 	/**
-	 * レガシー: メニュー順序のオプション名（後方互換用）
+	 * 設定画面: メニュー順序フィールドID（JS/HTML用）
 	 *
 	 * @var string
 	 */
-	private string $option_name = 'dcm_admin_menu_order';
+	private string $menu_order_field_id = 'dcm_admin_menu_order';
 
 	/**
-	 * レガシー: アコーディオン機能の有効/無効オプション名（後方互換用）
+	 * 設定画面: アコーディオンフィールドID（HTML用）
 	 *
 	 * @var string
 	 */
-	private string $accordion_option_name = 'dcm_admin_menu_accordion_enabled';
+	private string $accordion_field_id = 'dcm_admin_menu_accordion_enabled';
 
 	/**
-	 * レガシー: 未指定メニューを非表示にするオプション名（後方互換用）
+	 * 設定画面: 未指定メニュー非表示フィールドID（HTML用）
 	 *
 	 * @var string
 	 */
-	private string $hide_unspecified_option_name = 'dcm_admin_menu_hide_unspecified';
+	private string $hide_unspecified_field_id = 'dcm_admin_menu_hide_unspecified';
 
 	/**
 	 * 統合設定（DB）のオプション名
@@ -170,8 +170,6 @@ class DCM_Admin_Menu_Organizer {
 	 * @return void
 	 */
 	public function register_settings(): void {
-		$this->maybe_migrate_legacy_options();
-
 		register_setting(
 			'dcm_menu_organizer_group',
 			$this->settings_option_name,
@@ -241,47 +239,7 @@ class DCM_Admin_Menu_Organizer {
 			return $current + $defaults;
 		}
 
-		// まだ統合設定がない場合は、旧オプションから読み取る（後方互換）。
-		return [
-			'menu_order'        => (string) get_option( $this->option_name, '' ),
-			'accordion_enabled' => (bool) get_option( $this->accordion_option_name, false ),
-			'hide_unspecified'  => (bool) get_option( $this->hide_unspecified_option_name, false ),
-		] + $defaults;
-	}
-
-	/**
-	 * レガシーオプションを統合設定へ移行（1回だけ）
-	 *
-	 * @since 1.2.7
-	 *
-	 * @return void
-	 */
-	private function maybe_migrate_legacy_options(): void {
-		$existing = get_option( $this->settings_option_name, null );
-		if ( is_array( $existing ) ) {
-			return;
-		}
-
-		$sentinel      = '__dcm_amo_not_set__';
-		$legacy_menu   = get_option( $this->option_name, $sentinel );
-		$legacy_acc    = get_option( $this->accordion_option_name, $sentinel );
-		$legacy_hide   = get_option( $this->hide_unspecified_option_name, $sentinel );
-		$has_any_legacy = ( $legacy_menu !== $sentinel ) || ( $legacy_acc !== $sentinel ) || ( $legacy_hide !== $sentinel );
-
-		if ( ! $has_any_legacy ) {
-			return;
-		}
-
-		$settings = [
-			'menu_order'        => is_string( $legacy_menu ) ? $legacy_menu : '',
-			'accordion_enabled' => (bool) $legacy_acc,
-			'hide_unspecified'  => (bool) $legacy_hide,
-		] + $this->get_default_db_settings();
-
-		update_option( $this->settings_option_name, $settings );
-		delete_option( $this->option_name );
-		delete_option( $this->accordion_option_name );
-		delete_option( $this->hide_unspecified_option_name );
+		return $defaults;
 	}
 
 	/**
@@ -501,14 +459,14 @@ class DCM_Admin_Menu_Organizer {
 				<table class="form-table">
 					<tr>
 						<th scope="row">
-							<label for="<?php echo esc_attr( $this->option_name ); ?>">
+							<label for="<?php echo esc_attr( $this->menu_order_field_id ); ?>">
 								親メニュー表示順
 							</label>
 						</th>
 						<td>
 							<textarea 
 								name="<?php echo esc_attr( $this->settings_option_name ); ?>[menu_order]" 
-								id="<?php echo esc_attr( $this->option_name ); ?>"
+								id="<?php echo esc_attr( $this->menu_order_field_id ); ?>"
 								rows="20" 
 								cols="80"
 								class="large-text code"
@@ -567,7 +525,7 @@ tools.php</pre>
 				</tr>
 				<tr>
 					<th scope="row">
-						<label for="<?php echo esc_attr( $this->accordion_option_name ); ?>">
+						<label for="<?php echo esc_attr( $this->accordion_field_id ); ?>">
 							アコーディオン機能
 						</label>
 					</th>
@@ -576,7 +534,7 @@ tools.php</pre>
 							<input 
 								type="checkbox" 
 								name="<?php echo esc_attr( $this->settings_option_name ); ?>[accordion_enabled]" 
-								id="<?php echo esc_attr( $this->accordion_option_name ); ?>"
+								id="<?php echo esc_attr( $this->accordion_field_id ); ?>"
 								value="1"
 								<?php checked( $accordion_enabled, true ); ?>
 								<?php echo $is_file_config ? 'disabled' : ''; ?>
@@ -614,7 +572,7 @@ tools.php</pre>
 				</tr>
 				<tr>
 					<th scope="row">
-						<label for="<?php echo esc_attr( $this->hide_unspecified_option_name ); ?>">
+						<label for="<?php echo esc_attr( $this->hide_unspecified_field_id ); ?>">
 							未指定メニューの表示
 						</label>
 					</th>
@@ -623,7 +581,7 @@ tools.php</pre>
 							<input 
 								type="checkbox" 
 								name="<?php echo esc_attr( $this->settings_option_name ); ?>[hide_unspecified]" 
-								id="<?php echo esc_attr( $this->hide_unspecified_option_name ); ?>"
+								id="<?php echo esc_attr( $this->hide_unspecified_field_id ); ?>"
 								value="1"
 								<?php checked( $hide_unspecified, true ); ?>
 								<?php echo $is_file_config ? 'disabled' : ''; ?>
@@ -651,7 +609,7 @@ tools.php</pre>
 		<script>
 		document.addEventListener('DOMContentLoaded', function() {
 			const importButton = document.getElementById('import-current-menu');
-			const textarea = document.getElementById('<?php echo esc_js( $this->option_name ); ?>');
+			const textarea = document.getElementById('<?php echo esc_js( $this->menu_order_field_id ); ?>');
 			
 			if (importButton && textarea) {
 				importButton.addEventListener('click', function() {
@@ -1524,9 +1482,6 @@ tools.php</pre>
 		check_admin_referer( 'dcm_amo_reset' );
 
 		// 設定を初期状態に戻す
-		delete_option( $this->option_name );
-		delete_option( $this->accordion_option_name );
-		delete_option( $this->hide_unspecified_option_name );
 		delete_option( $this->settings_option_name );
 
 		// キャッシュもリセット
