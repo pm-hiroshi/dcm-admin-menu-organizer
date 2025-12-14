@@ -225,7 +225,7 @@ class DCM_Admin_Menu_Organizer {
 	}
 
 	/**
-	 * 統合設定（DB）を取得（後方互換: 旧3オプションからの移行/読み取り）
+	 * 統合設定（DB）を取得
 	 *
 	 * @since 1.0.0
 	 *
@@ -629,24 +629,8 @@ tools.php</pre>
 						if ( strpos( $slug, 'separator' ) === 0 ) {
 							continue;
 						}
-						// 可能な限りURL形式に統一（人が認知しやすい形）。
-						// - core: index.php / edit.php?post_type=page 等はそのまま
-						// - plugin: $menuのslugがpage値だけでも、a[href]は admin.php?page=... になりやすいので統一する
-						if ( 0 === strpos( $slug, 'admin.php?' ) || 0 === strpos( $slug, 'admin.php?page=' ) ) {
-							$menu_slugs[] = $slug;
-							continue;
-						}
-
-						$has_php   = strpos( $slug, '.php' ) !== false;
-						$has_q     = strpos( $slug, '?' ) !== false;
-						$has_slash = strpos( $slug, '/' ) !== false;
-
-						// 例: wp_dbmanager/database-manager.php のような page 値（スラッシュ＋.php）も admin.php?page= に寄せる
-						if ( ( ! $has_q && ! $has_php && ! $has_slash ) || ( $has_slash && $has_php && ! $has_q ) ) {
-							$menu_slugs[] = 'admin.php?page=' . $slug;
-						} else {
-							$menu_slugs[] = $slug;
-						}
+						// slugはそのまま出力する（設定入力の揺れはPHP側の解決ロジックで吸収する）
+						$menu_slugs[] = $slug;
 					}
 					$menu_slugs_json = wp_json_encode( $menu_slugs );
 					?>
@@ -1051,8 +1035,6 @@ tools.php</pre>
 	 * 例:
 	 * - https://example.test/wp-admin/admin.php?page=foo → admin.php?page=foo
 	 * - /wp-admin/edit.php?post_type=page → edit.php?post_type=page
-	 * - wp_file_manager → admin.php?page=wp_file_manager（後方互換）
-	 * - wp-dbmanager/database-manager.php → admin.php?page=wp-dbmanager/database-manager.php（後方互換）
 	 *
 	 * @since 1.0.0
 	 *
@@ -1082,20 +1064,6 @@ tools.php</pre>
 		$value = ltrim( $value, '/' );
 		if ( 0 === strpos( $value, 'wp-admin/' ) ) {
 			$value = substr( $value, strlen( 'wp-admin/' ) );
-		}
-
-		// 旧形式（slugのみ）をURL形式へ寄せる
-		$has_php   = strpos( $value, '.php' ) !== false;
-		$has_q     = strpos( $value, '?' ) !== false;
-		$has_slash = strpos( $value, '/' ) !== false;
-
-		if ( ! $has_php && ! $has_q && ! $has_slash && 0 !== strpos( $value, 'admin.php' ) ) {
-			return 'admin.php?page=' . $value;
-		}
-
-		// wp-dbmanager/database-manager.php のような page 値（スラッシュ＋.php）も admin.php?page= に寄せる
-		if ( $has_slash && $has_php && ! $has_q && 0 !== strpos( $value, 'admin.php' ) ) {
-			return 'admin.php?page=' . $value;
 		}
 
 		return $value;
@@ -1139,20 +1107,24 @@ tools.php</pre>
 	 * @return array<int, array<string, mixed>> menusをmenu_slug配列に解決したグループ
 	 */
 	private function resolve_groups_to_menu_slugs( array $groups, array $menu_by_slug, array $menu ): array {
-		$menu_by_href = [];
+		$menu_by_key = [];
 
 		foreach ( $menu as $item ) {
 			if ( empty( $item[2] ) ) {
 				continue;
 			}
 			$slug = (string) $item[2];
-			$href = $this->get_admin_href_from_menu_slug( $slug );
-			$key  = $this->normalize_admin_href_for_matching( $href );
-			if ( '' === $key ) {
-				continue;
+
+			// 入力は「slug」または「wp-admin相対URL」を許容するため、どちらでも引けるようにする。
+			$slug_key = $this->normalize_admin_href_for_matching( $slug );
+			if ( '' !== $slug_key && ! isset( $menu_by_key[ $slug_key ] ) ) {
+				$menu_by_key[ $slug_key ] = $slug;
 			}
-			if ( ! isset( $menu_by_href[ $key ] ) ) {
-				$menu_by_href[ $key ] = $slug;
+
+			$href     = $this->get_admin_href_from_menu_slug( $slug );
+			$href_key = $this->normalize_admin_href_for_matching( $href );
+			if ( '' !== $href_key && ! isset( $menu_by_key[ $href_key ] ) ) {
+				$menu_by_key[ $href_key ] = $slug;
 			}
 		}
 
@@ -1167,11 +1139,11 @@ tools.php</pre>
 				if ( '' === $key ) {
 					continue;
 				}
-				if ( ! isset( $menu_by_href[ $key ] ) ) {
+				if ( ! isset( $menu_by_key[ $key ] ) ) {
 					continue;
 				}
 
-				$slug = $menu_by_href[ $key ];
+				$slug = $menu_by_key[ $key ];
 				if ( isset( $menu_by_slug[ $slug ] ) ) {
 					$resolved[] = $slug;
 				}

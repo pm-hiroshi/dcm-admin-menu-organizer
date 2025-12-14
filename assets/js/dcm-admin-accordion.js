@@ -108,7 +108,7 @@
 				return;
 			}
 
-			// 後方互換: PHP側で付与済みでも、JS側でもクラスを揃えておく
+			// PHP側で付与済みでも、JS側でもクラスを揃えておく
 			menuItems.forEach(item => item.classList.add('dcm-accordion-menu-item'));
 
 			const updateState = () => {
