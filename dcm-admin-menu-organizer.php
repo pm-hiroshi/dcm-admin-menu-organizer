@@ -1413,10 +1413,21 @@ tools.php</pre>
 			return $links;
 		}
 
-		// plugins.php の「現在のURL（検索/絞り込み含む）」をベースにリセットURLを作る（将来のWP側パラメータ追加にも追従）。
-		// REQUEST_URI は /wp-admin/plugins.php?... の形なので site_url() でフルURL化する。
-		$current_url = isset( $_SERVER['REQUEST_URI'] ) ? site_url( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : admin_url( 'plugins.php' );
-		$current_url = remove_query_arg( [ 'dcm_amo_reset', 'dcm_amo_reset_done', '_wpnonce' ], $current_url );
+		// plugins.php の検索/絞り込み状態を維持したままリセットできるようにする。
+		// サブディレクトリ設置時に REQUEST_URI を site_url() へ渡すとパスが二重になるケースがあるため、
+		// admin_url('plugins.php') をベースに $_GET のクエリだけを合成する。
+		$current_url  = admin_url( 'plugins.php' );
+		$current_args = [];
+		foreach ( (array) $_GET as $key => $value ) {
+			if ( ! is_string( $key ) || is_array( $value ) ) {
+				continue;
+			}
+			$current_args[ sanitize_key( $key ) ] = wp_unslash( (string) $value );
+		}
+		if ( ! empty( $current_args ) ) {
+			$current_url = add_query_arg( $current_args, $current_url );
+		}
+		$current_url = remove_query_arg( [ 'dcm_amo_reset', 'dcm_amo_reset_done', '_wpnonce', 'action', 'action2', 'plugin', 'checked' ], $current_url );
 		$url         = wp_nonce_url(
 			add_query_arg( [ 'dcm_amo_reset' => '1' ], $current_url ),
 			'dcm_amo_reset'
