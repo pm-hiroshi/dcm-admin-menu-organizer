@@ -511,12 +511,12 @@ separator: コンテンツ管理
 edit.php?post_type=product
 edit.php?post_type=news
 
-separator: 入稿関連|#f0f6fc|#0969da|#0969da
+separator: 入稿関連|#000|#fff|#00a32a
 
 edit.php?post_type=article
 
 # アコーディオン有効時はアイコン色も指定可能
-separator: その他|#fff|#333|#333|#666
+separator: その他|#000|#fff|#999|#fff
 
 options-general.php
 tools.php</pre>
@@ -894,7 +894,7 @@ tools.php</pre>
 
 			// separatorのli要素自体のスタイル
 			$css_rules[] = sprintf(
-				'li#%s { height: auto !important; min-height: 36px; padding: 0 !important; margin: 0; }',
+				'li#%s { height: auto !important; min-height: 36px; padding: 0 !important; margin: 6px 0 4px !important; }',
 				esc_attr( $id )
 			);
 
@@ -908,8 +908,8 @@ tools.php</pre>
 			// CSS content内の文字列をエスケープ（二重引用符とバックスラッシュ）
 			$escaped_text = addcslashes( $text, '"\\' );
 
-			// 左ボーダー幅（3px）ぶんの見た目を常に揃える（未指定時は透明にする）
-			$padding = '10px 12px 10px 9px';
+			// 左ボーダー幅（4px）ぶんの見た目を常に揃える（未指定時は透明にする）
+			$padding = '10px 12px 10px 8px';
 
 			$after_styles = sprintf(
 				'content: "%s"; display: block; padding: %s; font-size: 14px; font-weight: 600; letter-spacing: 0.3px; line-height: 1.2;',
@@ -929,12 +929,16 @@ tools.php</pre>
 
 			// 左ボーダー（未指定時は透明にして幅だけ揃える）
 			$after_styles .= sprintf(
-				' border-left: 3px solid %s;',
+				' border-left: 4px solid %s !important;',
 				! empty( $border_color ) ? $border_color : 'transparent'
 			);
 
 			$css_rules[] = sprintf( 'li#%s::after { %s }', esc_attr( $id ), $after_styles );
 		}
+
+		// セパレーター直前のメニュー（JSでクラス付与済み）はサブメニュー下余白を詰める（余白の二重化防止）
+		$css_rules[] = '#adminmenu li.dcm-menu-before-separator ul.wp-submenu { padding-bottom: 0 !important; }';
+		$css_rules[] = '#adminmenu li.dcm-menu-before-separator { margin-bottom: 0 !important; }';
 
 		if ( ! empty( $css_rules ) ) {
 			$css = implode( "\n", $css_rules );

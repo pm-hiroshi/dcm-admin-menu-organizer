@@ -11,6 +11,14 @@
 		return;
 	}
 
+	// セパレーター直前のメニュー（サブメニュー展開時に余白が出やすい）へクラス付与
+	separators.forEach((sep) => {
+		const prev = sep.previousElementSibling;
+		if (prev && prev.matches && prev.matches('li.menu-top')) {
+			prev.classList.add('dcm-menu-before-separator');
+		}
+	});
+
 	document.body.classList.add('dcm-accordion-loading');
 
 	const storageKey = 'dcm_accordion_state';
