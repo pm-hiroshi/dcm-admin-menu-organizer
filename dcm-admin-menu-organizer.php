@@ -700,10 +700,9 @@ tools.php</pre>
 		// 新しいメニュー配列を構築
 		$new_menu     = [];
 		$new_position = 0;
-		$group_id     = 0;
+		$separator_group_id = 0;
 
 		foreach ( $groups as $group ) {
-			$group_id++;
 			$accordion_group_class = '';
 			$is_text_separator     = false;
 
@@ -722,7 +721,8 @@ tools.php</pre>
 					];
 				} elseif ( 'separator_text' === $sep['type'] ) {
 					// テキスト付きセパレーター
-					$id                         = 'separator-group-' . $group_id;
+					$separator_group_id++;
+					$id                         = 'separator-group-' . $separator_group_id;
 					$locked_class               = '';
 					if ( '' !== $current_top_slug && ! empty( $group['menus'] ) ) {
 						if ( in_array( $current_top_slug, (array) $group['menus'], true ) ) {
@@ -867,11 +867,9 @@ tools.php</pre>
 		}
 
 		$css_rules = [];
-		$group_id  = 0;
+		$separator_group_id = 0;
 
 		foreach ( $groups as $group ) {
-			$group_id++;
-
 			if ( empty( $group['separator'] ) ) {
 				continue;
 			}
@@ -881,7 +879,8 @@ tools.php</pre>
 				continue;
 			}
 
-			$id           = 'separator-group-' . $group_id;
+			$separator_group_id++;
+			$id           = 'separator-group-' . $separator_group_id;
 			$text         = $sep['text'];
 			$bg_color     = ! empty( $sep['bg_color'] ) ? $sep['bg_color'] : '';
 			$text_color   = ! empty( $sep['text_color'] ) ? $sep['text_color'] : '#a0a5aa';
@@ -1232,16 +1231,15 @@ tools.php</pre>
 	 */
 	private function build_accordion_data( array $groups ): ?array {
 		$accordion_groups = [];
-		$group_id         = 0;
+		$separator_group_id = 0;
 
 		foreach ( $groups as $group ) {
-			$group_id++;
-
 			if ( empty( $group['separator'] ) || 'separator_text' !== $group['separator']['type'] ) {
 				continue;
 			}
 
-			$separator_id = 'separator-group-' . $group_id;
+			$separator_group_id++;
+			$separator_id = 'separator-group-' . $separator_group_id;
 			// JS側は a[href]（wp-admin相対）で突合するため、コア同等のhrefに変換して渡す。
 			$menu_slugs = [];
 			foreach ( (array) $group['menus'] as $slug ) {
@@ -1341,19 +1339,19 @@ tools.php</pre>
 		
 		<?php
 		// 各グループのアイコン色を個別に設定（separator_textのみ）
-		$group_id = 0;
+		$separator_group_id = 0;
 		foreach ( $groups as $group ) {
-			$group_id++;
 			if ( empty( $group['separator'] ) || 'separator_text' !== $group['separator']['type'] ) {
 				continue;
 			}
+			$separator_group_id++;
 
 			$icon_color = ! empty( $group['separator']['icon_color'] ) ? $this->sanitize_color_code( $group['separator']['icon_color'] ) : '';
 			if ( empty( $icon_color ) ) {
 				continue;
 			}
 
-			$separator_id = esc_attr( 'separator-group-' . $group_id );
+			$separator_id = esc_attr( 'separator-group-' . $separator_group_id );
 			echo sprintf(
 				'li#%s.dcm-accordion-separator::before { color: %s !important; }' . "\n\t\t",
 				$separator_id,
