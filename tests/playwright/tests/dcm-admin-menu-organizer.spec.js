@@ -43,7 +43,11 @@ test('管理メニュー並び替え: 主要フロー', async ({ page, baseURL }
       // WordPressのログインフォームは文言/言語で揺れるので、idで確実に埋める
       await page.locator('#user_login').fill(user);
       await page.locator('#user_pass').fill(pass);
-      await page.locator('#wp-submit').click();
+      // wait を先に張ってからクリック（取りこぼし防止）
+      await Promise.all([
+        page.waitForURL(/\/wp-admin\//, { timeout: 60_000 }).catch(() => { }),
+        page.locator('#wp-submit').click(),
+      ]);
       // ログイン成功なら wp-admin 側へ遷移するはず。失敗時はエラー表示のまま。
       try {
         await page.waitForURL(/\/wp-admin\//, { timeout: 30_000 });
@@ -82,6 +86,20 @@ test('管理メニュー並び替え: 主要フロー', async ({ page, baseURL }
     });
 
     await screenshot('01-settings-page.png');
+
+    // テストが環境に依存しないよう、テキストセパレーター2つ + 主要メニューをセットして保存しておく
+    // - グループA: plugins.php（現在地ではないので折りたたみ可能なはず）
+    // - グループB: index.php（ダッシュボード=現在地なのでロック対象）
+    await page.locator('#dcm_admin_menu_order').fill([
+      'separator: グループA|#f0f6fc|#0969da|#0969da',
+      'plugins.php',
+      'separator: グループB|#f0f6fc|#0969da|#0969da',
+      'index.php',
+      'edit.php',
+    ].join('\\n'));
+    await page.locator('#dcm_admin_menu_accordion_enabled').check();
+    await page.getByRole('button', { name: '設定を保存' }).click();
+    await expect(page.getByText('設定を保存しました。')).toBeVisible();
   });
 
   await test.step('ダッシュボード: セパレーター表示 & アコーディオン動作', async () => {
@@ -90,50 +108,57 @@ test('管理メニュー並び替え: 主要フロー', async ({ page, baseURL }
     await page.evaluate(() => localStorage.removeItem('dcm_accordion_state'));
     await page.reload();
 
-    await expect(page.locator('#separator-group-1')).toBeVisible();
+    const pluginsLi = page.locator('#menu-plugins');
+    await expect(pluginsLi).toBeVisible();
 
-    const sepInfo = await page.evaluate(() => {
-      const el = document.getElementById('separator-group-1');
+    // plugins を含むグループAのセパレーターIDを、classから逆引きする
+    const groupASeparatorId = await pluginsLi.evaluate((el) => {
+      const cls = Array.from(el.classList).find((c) => c.startsWith('dcm-accordion-group-separator-group-'));
+      return cls ? cls.replace('dcm-accordion-group-', '') : '';
+    });
+    expect(groupASeparatorId).toMatch(/^separator-group-\\d+$/);
+
+    const sep = page.locator(`#${groupASeparatorId}`);
+    await expect(sep).toBeVisible();
+
+    const sepInfo = await page.evaluate((separatorId) => {
+      const el = document.getElementById(separatorId);
       if (!el) {
         return null;
       }
       return {
+        id: separatorId,
         className: el.className,
         afterContent: getComputedStyle(el, '::after').content,
       };
-    });
+    }, groupASeparatorId);
 
     expect(sepInfo).not.toBeNull();
     expect(sepInfo.className).toContain('dcm-accordion-separator');
-    // CSS ::after にテキストが出る想定（例: "入稿関連1"）
     expect(sepInfo.afterContent).not.toBe('none');
-
-    // 折りたたみ前: ダッシュボード項目が見える
-    const dashboardLi = page.locator('#menu-dashboard');
-    await expect(dashboardLi).toBeVisible();
 
     await screenshot('02-dashboard-before.png');
 
     // セパレーターをクリック → グループが折りたたまれ、配下が非表示になる
-    await page.locator('#separator-group-1').click();
-    await expect(page.locator('#separator-group-1')).toHaveClass(/dcm-collapsed/);
-    await expect(dashboardLi).toHaveClass(/dcm-hidden/);
+    await sep.click();
+    await expect(sep).toHaveClass(/dcm-collapsed/);
+    await expect(pluginsLi).toHaveClass(/dcm-hidden/);
 
     await attachJson('step-02-accordion-collapsed.json', {
-      separatorId: 'separator-group-1',
+      separatorId: groupASeparatorId,
       sepInfo,
-      dashboardHidden: await dashboardLi.evaluate((el) => el.classList.contains('dcm-hidden')),
+      pluginsHidden: await pluginsLi.evaluate((el) => el.classList.contains('dcm-hidden')),
     });
 
     await screenshot('03-dashboard-collapsed.png');
 
     // リロードしても維持される（localStorage）
     await page.reload();
-    await expect(page.locator('#separator-group-1')).toHaveClass(/dcm-collapsed/);
-    await expect(dashboardLi).toHaveClass(/dcm-hidden/);
+    await expect(sep).toHaveClass(/dcm-collapsed/);
+    await expect(pluginsLi).toHaveClass(/dcm-hidden/);
 
     const stored = await page.evaluate(() => localStorage.getItem('dcm_accordion_state'));
-    expect(stored || '').toContain('separator-group-1');
+    expect(stored || '').toContain(groupASeparatorId);
 
     await attachJson('step-03-accordion-persisted.json', {
       stored,

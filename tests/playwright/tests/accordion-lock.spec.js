@@ -14,13 +14,10 @@ test('現在地グループのセパレーターは閉じられない', async ({
   if (page.url().includes('/wp-login.php')) {
     await page.locator('#user_login').fill(user);
     await page.locator('#user_pass').fill(pass);
-    await page.locator('#wp-submit').click();
-
-    // ログインは画面遷移（成功/失敗どちらも）するので、まず遷移を待つ。
-    // 失敗時は login_error が出るのでメッセージも拾う。
-    await Promise.race([
-      page.waitForNavigation({ timeout: 60_000, waitUntil: 'domcontentloaded' }),
-      page.locator('#login_error').waitFor({ timeout: 60_000 }),
+    // wait を先に張ってからクリック（取りこぼし防止）
+    await Promise.all([
+      page.waitForURL(/\/wp-admin\//, { timeout: 60_000, waitUntil: 'domcontentloaded' }).catch(() => { }),
+      page.locator('#wp-submit').click(),
     ]);
 
     if (page.url().includes('/wp-login.php')) {
