@@ -908,8 +908,8 @@ tools.php</pre>
 			// CSS content内の文字列をエスケープ（二重引用符とバックスラッシュ）
 			$escaped_text = addcslashes( $text, '"\\' );
 
-			// 左ボーダーがある場合は左paddingを調整（ボーダー分減らす）
-			$padding = ! empty( $border_color ) ? '10px 12px 10px 9px' : '10px 12px';
+			// 左ボーダー幅（3px）ぶんの見た目を常に揃える（未指定時は透明にする）
+			$padding = '10px 12px 10px 9px';
 
 			$after_styles = sprintf(
 				'content: "%s"; display: block; padding: %s; font-size: 14px; font-weight: 600; letter-spacing: 0.3px; line-height: 1.2;',
@@ -927,10 +927,11 @@ tools.php</pre>
 				$after_styles .= sprintf( ' background-color: %s;', $bg_color );
 			}
 
-			// 左ボーダー（指定がある場合のみ）
-			if ( ! empty( $border_color ) ) {
-				$after_styles .= sprintf( ' border-left: 3px solid %s;', $border_color );
-			}
+			// 左ボーダー（未指定時は透明にして幅だけ揃える）
+			$after_styles .= sprintf(
+				' border-left: 3px solid %s;',
+				! empty( $border_color ) ? $border_color : 'transparent'
+			);
 
 			$css_rules[] = sprintf( 'li#%s::after { %s }', esc_attr( $id ), $after_styles );
 		}
