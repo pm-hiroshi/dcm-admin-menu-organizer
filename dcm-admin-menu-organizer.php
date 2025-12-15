@@ -629,8 +629,17 @@ tools.php</pre>
 						if ( strpos( $slug, 'separator' ) === 0 ) {
 							continue;
 						}
-						// slugはそのまま出力する（設定入力の揺れはPHP側の解決ロジックで吸収する）
-						$menu_slugs[] = $slug;
+						// インポートは「見やすさ」を優先して、可能なら admin.php?page=... 形式で出力する。
+						// （内部は slug / URL どちらでも解決できる）
+						$has_php   = strpos( $slug, '.php' ) !== false;
+						$has_q     = strpos( $slug, '?' ) !== false;
+						$has_slash = strpos( $slug, '/' ) !== false;
+
+						if ( ! $has_php && ! $has_q && ! $has_slash ) {
+							$menu_slugs[] = 'admin.php?page=' . $slug;
+						} else {
+							$menu_slugs[] = $slug;
+						}
 					}
 					$menu_slugs_json = wp_json_encode( $menu_slugs );
 					?>
