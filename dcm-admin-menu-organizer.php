@@ -863,6 +863,7 @@ tools.php</pre>
 
 		$css_rules = [];
 		$separator_group_id = 0;
+		$has_text_separator = false;
 
 		foreach ( $groups as $group ) {
 			if ( empty( $group['separator'] ) ) {
@@ -874,6 +875,7 @@ tools.php</pre>
 				continue;
 			}
 
+			$has_text_separator = true;
 			$separator_group_id++;
 			$id           = 'separator-group-' . $separator_group_id;
 			$text         = $sep['text'];
@@ -885,18 +887,6 @@ tools.php</pre>
 			$bg_color     = $this->sanitize_color_code( $bg_color );
 			$text_color   = $this->sanitize_color_code( $text_color );
 			$border_color = $this->sanitize_color_code( $border_color );
-
-			// separatorのli要素自体のスタイル
-			$css_rules[] = sprintf(
-				'li#%s { height: auto !important; min-height: 36px; padding: 0 !important; margin: 6px 0 4px !important; }',
-				esc_attr( $id )
-			);
-
-			// デフォルトのseparator横線を非表示
-			$css_rules[] = sprintf(
-				'li#%s .separator { display: none; }',
-				esc_attr( $id )
-			);
 
 			// テキスト表示用のスタイル（背景色と文字色を動的に設定）
 			// CSS content内の文字列をエスケープ（二重引用符とバックスラッシュ）
@@ -928,6 +918,12 @@ tools.php</pre>
 			);
 
 			$css_rules[] = sprintf( 'li#%s::after { %s }', esc_attr( $id ), $after_styles );
+		}
+
+		// テキストセパレーター共通のスタイル（各IDごとに同じ内容を出さない）
+		if ( $has_text_separator ) {
+			$css_rules[] = '#adminmenu > li.dcm-accordion-separator { height: auto !important; min-height: 36px; padding: 0 !important; margin: 4px 0 4px !important; }';
+			$css_rules[] = '#adminmenu > li.dcm-accordion-separator .separator { display: none; }';
 		}
 
 		// セパレーター直前のメニュー（JSでクラス付与済み）はサブメニュー下余白を詰める（余白の二重化防止）

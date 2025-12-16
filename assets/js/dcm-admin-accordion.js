@@ -161,6 +161,21 @@
 
 			const isCollapsed = !mustStartExpanded && state[separatorId] === 'collapsed';
 
+			// WPコアのセパレーターは aria-hidden="true" になりがちなので、アクセシビリティ警告を避ける
+			separatorLi.removeAttribute('aria-hidden');
+			separatorLi.setAttribute('aria-hidden', 'false');
+			try {
+				const content = getComputedStyle(separatorLi, '::after').content;
+				if (content && content !== 'none') {
+					const label = content.replace(/^['"]|['"]$/g, '');
+					if (label) {
+						separatorLi.setAttribute('aria-label', label);
+					}
+				}
+			} catch (e) {
+				// ignore
+			}
+
 			// セパレーターにARIA属性を付与（現在地グループも閉じられる）
 			separatorLi.setAttribute('tabindex', '0');
 			separatorLi.setAttribute('role', 'button');
