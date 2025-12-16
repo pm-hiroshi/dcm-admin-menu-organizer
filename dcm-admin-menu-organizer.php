@@ -1339,12 +1339,14 @@ tools.php</pre>
 		
 		/* アコーディオン: 開閉アイコン（デフォルト） */
 		.dcm-accordion-separator::before {
-			content: '▼';
+			content: '\f140'; /* dashicons-arrow-down */
 			position: absolute;
 			right: 12px;
 			top: 50%;
 			transform: translateY(-50%);
-			font-size: 10px;
+			font-family: dashicons;
+			font-size: 16px;
+			line-height: 1;
 			color: #fff;
 			transition: transform 0.2s ease;
 			pointer-events: none;
@@ -1352,7 +1354,7 @@ tools.php</pre>
 		}
 		
 		.dcm-accordion-separator.dcm-collapsed::before {
-			content: '▶';
+			content: '\f139'; /* dashicons-arrow-right */
 		}
 		
 		<?php
