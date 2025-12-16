@@ -19,8 +19,6 @@
 		}
 	});
 
-	document.body.classList.add('dcm-accordion-loading');
-
 	const storageKey = 'dcm_accordion_state';
 
 	/**
@@ -77,61 +75,10 @@
 	})();
 
 	/**
-	 * 現在地グループのセパレーターIDを取得
-	 */
-	function getCurrentSeparatorId() {
-		// WP標準の current 判定（存在すれば最優先）
-		let currentTop =
-			document.querySelector('#adminmenu > li.menu-top.wp-has-current-submenu') ||
-			document.querySelector('#adminmenu > li.menu-top.current');
-
-		// サブメニュー側の current からトップを辿るフォールバック
-		if (!currentTop) {
-			const current = document.querySelector('#adminmenu li.current');
-			if (current && current.closest) {
-				const top = current.closest('li.menu-top');
-				if (top) {
-					currentTop = top;
-				}
-			}
-		}
-
-		if (!currentTop) {
-			return '';
-		}
-
-		// まずはグループクラスから特定（最短）
-		const groupClass = Array.from(currentTop.classList).find((c) => c.startsWith('dcm-accordion-group-separator-group-'));
-		if (groupClass) {
-			const sid = groupClass.replace('dcm-accordion-group-', '');
-			if (sid && document.getElementById(sid)) {
-				return sid;
-			}
-		}
-
-		// フォールバック: 直前のセパレーターを探す
-		let prev = currentTop.previousElementSibling;
-		while (prev) {
-			if (
-				prev instanceof HTMLElement &&
-				prev.id &&
-				prev.id.startsWith('separator-group-') &&
-				prev.classList.contains('dcm-accordion-separator')
-			) {
-				return prev.id;
-			}
-			prev = prev.previousElementSibling;
-		}
-
-		return '';
-	}
-
-	/**
 	 * アコーディオン初期化: 保存状態を適用、クリックで開閉。
 	 */
 	function initAccordion() {
 		let state = getAccordionState();
-		const currentSeparatorId = getCurrentSeparatorId();
 
 		separators.forEach((separatorLi) => {
 			const separatorId = separatorLi.id;
@@ -143,17 +90,8 @@
 				return;
 			}
 
-			const hasCurrentInGroup = menuItems.some((item) => {
-				return (
-					item.classList.contains('current') ||
-					item.classList.contains('wp-has-current-submenu') ||
-					!!item.querySelector('.current') ||
-					!!item.querySelector('.wp-has-current-submenu')
-				);
-			});
-
-			// 現在地を含むグループは「初期表示では必ず展開」
-			const mustStartExpanded = (currentSeparatorId && separatorId === currentSeparatorId) || hasCurrentInGroup;
+			// PHP側で現在地グループのセパレーターにクラス付与済み（JSは判定しない）
+			const mustStartExpanded = separatorLi.classList.contains('dcm-accordion-initial-open');
 			if (mustStartExpanded) {
 				state[separatorId] = 'expanded';
 				saveAccordionState(state);
