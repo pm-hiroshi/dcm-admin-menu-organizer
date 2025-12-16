@@ -722,19 +722,13 @@ tools.php</pre>
 				} elseif ( 'separator_text' === $sep['type'] ) {
 					// テキスト付きセパレーター
 					$separator_group_id++;
-					$id                         = 'separator-group-' . $separator_group_id;
-					$locked_class               = '';
-					if ( '' !== $current_top_slug && ! empty( $group['menus'] ) ) {
-						if ( in_array( $current_top_slug, (array) $group['menus'], true ) ) {
-							$locked_class = ' dcm-accordion-locked';
-						}
-					}
+					$id = 'separator-group-' . $separator_group_id;
 					$new_menu[ $new_position ] = [
 						'',
 						'read',
 						$id,
 						'',
-						'wp-menu-separator dcm-accordion-separator' . $locked_class,
+						'wp-menu-separator dcm-accordion-separator',
 						$id,
 					];
 					$is_text_separator          = true;
@@ -1306,17 +1300,8 @@ tools.php</pre>
 			position: relative;
 		}
 		
-		.dcm-accordion-separator:not(.dcm-accordion-locked):hover::after {
+		.dcm-accordion-separator:hover::after {
 			opacity: 0.8;
-		}
-		
-		/* 現在地を含むグループは閉じられない（クリック不可） */
-		.dcm-accordion-separator.dcm-accordion-locked {
-			cursor: default !important;
-		}
-		
-		.dcm-accordion-separator.dcm-accordion-locked::before {
-			display: none;
 		}
 		
 		/* アコーディオン: 開閉アイコン（デフォルト） */

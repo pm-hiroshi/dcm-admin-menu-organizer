@@ -77,47 +77,97 @@
 	})();
 
 	/**
+	 * 現在地グループのセパレーターIDを取得
+	 */
+	function getCurrentSeparatorId() {
+		// WP標準の current 判定（存在すれば最優先）
+		let currentTop =
+			document.querySelector('#adminmenu > li.menu-top.wp-has-current-submenu') ||
+			document.querySelector('#adminmenu > li.menu-top.current');
+
+		// サブメニュー側の current からトップを辿るフォールバック
+		if (!currentTop) {
+			const current = document.querySelector('#adminmenu li.current');
+			if (current && current.closest) {
+				const top = current.closest('li.menu-top');
+				if (top) {
+					currentTop = top;
+				}
+			}
+		}
+
+		if (!currentTop) {
+			return '';
+		}
+
+		// まずはグループクラスから特定（最短）
+		const groupClass = Array.from(currentTop.classList).find((c) => c.startsWith('dcm-accordion-group-separator-group-'));
+		if (groupClass) {
+			const sid = groupClass.replace('dcm-accordion-group-', '');
+			if (sid && document.getElementById(sid)) {
+				return sid;
+			}
+		}
+
+		// フォールバック: 直前のセパレーターを探す
+		let prev = currentTop.previousElementSibling;
+		while (prev) {
+			if (
+				prev instanceof HTMLElement &&
+				prev.id &&
+				prev.id.startsWith('separator-group-') &&
+				prev.classList.contains('dcm-accordion-separator')
+			) {
+				return prev.id;
+			}
+			prev = prev.previousElementSibling;
+		}
+
+		return '';
+	}
+
+	/**
 	 * アコーディオン初期化: 保存状態を適用、クリックで開閉。
 	 */
 	function initAccordion() {
 		let state = getAccordionState();
+		const currentSeparatorId = getCurrentSeparatorId();
 
-		separators.forEach(separatorLi => {
+		separators.forEach((separatorLi) => {
 			const separatorId = separatorLi.id;
 			const groupClass = 'dcm-accordion-group-' + separatorId;
 
 			const menuItems = Array.from(document.querySelectorAll('#adminmenu > li.' + groupClass));
-
-			// PHP側で現在地グループのセパレーターにロッククラスを付与しているため、
-			// JS側はロッククラスの有無だけを見て「閉じられない」ようにする。
-			if (separatorLi.classList.contains('dcm-accordion-locked')) {
-				separatorLi.classList.add('dcm-accordion-locked');
-				separatorLi.classList.remove('dcm-collapsed');
-				menuItems.forEach((item) => item.classList.remove('dcm-hidden'));
-
-				separatorLi.setAttribute('aria-expanded', 'true');
-				separatorLi.setAttribute('aria-disabled', 'true');
-				separatorLi.removeAttribute('tabindex');
-				separatorLi.removeAttribute('role');
-
-				state[separatorId] = 'expanded';
-				saveAccordionState(state);
-				return;
-			}
-
-			// セパレーターにクラスとARIA属性を付与
-			const isCollapsed = state[separatorId] === 'collapsed';
-			separatorLi.setAttribute('tabindex', '0');
-			separatorLi.setAttribute('role', 'button');
-			separatorLi.setAttribute('aria-expanded', (!isCollapsed).toString());
-
 			if (menuItems.length === 0) {
 				console.warn('DCM Accordion: No menu items found for group:', separatorId);
 				return;
 			}
 
+			const hasCurrentInGroup = menuItems.some((item) => {
+				return (
+					item.classList.contains('current') ||
+					item.classList.contains('wp-has-current-submenu') ||
+					!!item.querySelector('.current') ||
+					!!item.querySelector('.wp-has-current-submenu')
+				);
+			});
+
+			// 現在地を含むグループは「初期表示では必ず展開」
+			const mustStartExpanded = (currentSeparatorId && separatorId === currentSeparatorId) || hasCurrentInGroup;
+			if (mustStartExpanded) {
+				state[separatorId] = 'expanded';
+				saveAccordionState(state);
+			}
+
+			const isCollapsed = !mustStartExpanded && state[separatorId] === 'collapsed';
+
+			// セパレーターにARIA属性を付与（現在地グループも閉じられる）
+			separatorLi.setAttribute('tabindex', '0');
+			separatorLi.setAttribute('role', 'button');
+			separatorLi.setAttribute('aria-expanded', (!isCollapsed).toString());
+
 			// PHP側で付与済みでも、JS側でもクラスを揃えておく
-			menuItems.forEach(item => item.classList.add('dcm-accordion-menu-item'));
+			menuItems.forEach((item) => item.classList.add('dcm-accordion-menu-item'));
 
 			const updateState = () => {
 				const expanded = !separatorLi.classList.contains('dcm-collapsed');
@@ -127,38 +177,37 @@
 			};
 
 			let isToggling = false;
-
 			if (isCollapsed) {
 				separatorLi.classList.add('dcm-collapsed');
-				menuItems.forEach(item => item.classList.add('dcm-hidden'));
+				menuItems.forEach((item) => item.classList.add('dcm-hidden'));
+			} else {
+				separatorLi.classList.remove('dcm-collapsed');
+				menuItems.forEach((item) => item.classList.remove('dcm-hidden'));
 			}
 
-			const toggle = e => {
+			const toggle = (e) => {
 				e.preventDefault();
 				e.stopPropagation();
-
-				if (separatorLi.classList.contains('dcm-accordion-locked')) {
-					return;
-				}
 
 				if (isToggling) {
 					return;
 				}
 				isToggling = true;
 
-				const nowCollapsed = separatorLi.classList.toggle('dcm-collapsed');
-				menuItems.forEach(item => item.classList.toggle('dcm-hidden'));
+				separatorLi.classList.toggle('dcm-collapsed');
+				menuItems.forEach((item) => item.classList.toggle('dcm-hidden'));
 
 				triggerResize();
-
 				updateState();
 
 				// トグルガード（連続クリック防止）
-				requestAnimationFrame(() => { isToggling = false; });
+				requestAnimationFrame(() => {
+					isToggling = false;
+				});
 			};
 
 			separatorLi.addEventListener('click', toggle);
-			separatorLi.addEventListener('keydown', e => {
+			separatorLi.addEventListener('keydown', (e) => {
 				if (e.key === 'Enter' || e.key === ' ') {
 					toggle(e);
 				}
