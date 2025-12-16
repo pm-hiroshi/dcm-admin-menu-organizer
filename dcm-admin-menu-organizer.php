@@ -674,7 +674,8 @@ tools.php</pre>
 			return;
 		}
 
-		// 現在地のトップレベルメニュー（WP標準の判定結果）を使ってロック対象グループを決める。
+		// 現在地のトップレベルメニュー（WP標準の判定結果）を使って、
+		// 「初期表示で必ず展開するグループ（現在地を含むグループ）」を決める。
 		// REQUEST_URI は /wp-admin/ と index.php の揺れ等があるため避ける。
 		$current_top_slug = '';
 		if ( function_exists( 'get_admin_page_parent' ) ) {
