@@ -1393,6 +1393,11 @@ tools.php</pre>
 		body.dcm-accordion-loading #adminmenu {
 			opacity: 0;
 		}
+		
+		/* 折りたたみ時はテキストを全角スペース1文字に（トグルアイコンのみ表示） */
+		body.folded #adminmenu > li.dcm-accordion-separator::after {
+			content: "\3000" !important;
+		}
 		</style>
 		<?php
 	}
