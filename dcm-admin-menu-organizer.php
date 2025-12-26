@@ -525,7 +525,7 @@ class DCM_Admin_Menu_Organizer {
 										• <code>separator</code> = 区切り線（横線のみ）<br>
 										• <code>separator: テキスト</code> = ラベル付き区切り線<br>
 										• <code>separator: テキスト|背景色|文字色</code> = 背景色・文字色を指定<br>
-										• <code>separator: テキスト|背景色|文字色|左ボーダー色</code> = 左に3pxのボーダーを追加<br>
+										• <code>separator: テキスト|背景色|文字色|左ボーダー色</code> = 左に4pxのボーダーを追加<br>
 										• <code>separator: テキスト|背景色|文字色|左ボーダー色|アイコン色</code> = アコーディオンアイコンの色を指定（アコーディオン有効時のみ）<br>
 										• 空行や <code>#</code> で始まる行はコメントとして無視されます<br>
 										<br>
@@ -547,12 +547,12 @@ separator: コンテンツ管理
 edit.php?post_type=product
 edit.php?post_type=news
 
-separator: 入稿関連|#000|#fff|#00a32a
+separator: 入稿関連|#f0f6fc|#0969da|#0969da
 
 edit.php?post_type=article
 
 # アコーディオン有効時はアイコン色も指定可能
-separator: その他|#000|#fff|#999|#fff
+separator: その他|#fff|#333|#333|#666
 
 options-general.php
 tools.php</pre>
@@ -710,8 +710,7 @@ tools.php</pre>
 			return;
 		}
 
-		// 現在地のトップレベルメニュー（WP標準の判定結果）を使って、
-		// 「初期表示で必ず展開するグループ（現在地を含むグループ）」を決める。
+		// 現在地のトップレベルメニュー（WP標準の判定結果）を取得
 		// REQUEST_URI は /wp-admin/ と index.php の揺れ等があるため避ける。
 		$current_top_slug = '';
 		if ( function_exists( 'get_admin_page_parent' ) ) {
@@ -737,9 +736,10 @@ tools.php</pre>
 		// 新しいメニュー配列を構築
 		$new_menu     = [];
 		$new_position = 0;
-		$separator_group_id = 0;
+		$group_id     = 0;
 
 		foreach ( $groups as $group ) {
+			$group_id++;
 			$accordion_group_class = '';
 			$is_text_separator     = false;
 
@@ -758,14 +758,20 @@ tools.php</pre>
 					];
 				} elseif ( 'separator_text' === $sep['type'] ) {
 					// テキスト付きセパレーター
-					$separator_group_id++;
-					$id = 'separator-group-' . $separator_group_id;
+					$id                         = 'separator-group-' . $group_id;
+					// 現在地を含むグループは初期展開用のクラスを付与（ロックはしない）
+					$initial_open_class = '';
+					if ( '' !== $current_top_slug && ! empty( $group['menus'] ) ) {
+						if ( in_array( $current_top_slug, (array) $group['menus'], true ) ) {
+							$initial_open_class = ' dcm-accordion-initial-open';
+						}
+					}
 					$new_menu[ $new_position ] = [
 						'',
 						'read',
 						$id,
 						'',
-						'wp-menu-separator dcm-accordion-separator',
+						'wp-menu-separator dcm-accordion-separator' . $initial_open_class,
 						$id,
 					];
 					$is_text_separator          = true;
@@ -898,10 +904,11 @@ tools.php</pre>
 		}
 
 		$css_rules = [];
-		$separator_group_id = 0;
-		$has_text_separator = false;
+		$group_id  = 0;
 
 		foreach ( $groups as $group ) {
+			$group_id++;
+
 			if ( empty( $group['separator'] ) ) {
 				continue;
 			}
@@ -911,9 +918,7 @@ tools.php</pre>
 				continue;
 			}
 
-			$has_text_separator = true;
-			$separator_group_id++;
-			$id           = 'separator-group-' . $separator_group_id;
+			$id           = 'separator-group-' . $group_id;
 			$text         = $sep['text'];
 			$bg_color     = ! empty( $sep['bg_color'] ) ? $sep['bg_color'] : '';
 			$text_color   = ! empty( $sep['text_color'] ) ? $sep['text_color'] : '#a0a5aa';
@@ -923,6 +928,18 @@ tools.php</pre>
 			$bg_color     = $this->sanitize_color_code( $bg_color );
 			$text_color   = $this->sanitize_color_code( $text_color );
 			$border_color = $this->sanitize_color_code( $border_color );
+
+			// separatorのli要素自体のスタイル
+			$css_rules[] = sprintf(
+				'li#%s { height: auto !important; min-height: 36px; padding: 0 !important; margin: 0; }',
+				esc_attr( $id )
+			);
+
+			// デフォルトのseparator横線を非表示
+			$css_rules[] = sprintf(
+				'li#%s .separator { display: none; }',
+				esc_attr( $id )
+			);
 
 			// テキスト表示用のスタイル（背景色と文字色を動的に設定）
 			// CSS content内の文字列をエスケープ（二重引用符とバックスラッシュ）
@@ -954,13 +971,11 @@ tools.php</pre>
 			);
 
 			$css_rules[] = sprintf( 'li#%s::after { %s }', esc_attr( $id ), $after_styles );
+
 		}
 
-		// テキストセパレーター共通のスタイル（各IDごとに同じ内容を出さない）
-		if ( $has_text_separator ) {
-			$css_rules[] = '#adminmenu > li.dcm-accordion-separator { height: auto !important; min-height: 36px; padding: 0 !important; margin: 4px 0 4px !important; }';
-			$css_rules[] = '#adminmenu > li.dcm-accordion-separator .separator { display: none; }';
-		}
+		// 独自セパレーターのmargin-bottomを0にする（変な隙間をなくす）
+		$css_rules[] = '#adminmenu li[id^="separator-"] { margin-top: 6px !important; margin-bottom: 6px !important; }';
 
 		// セパレーター直前のメニュー（JSでクラス付与済み）はサブメニュー下余白を詰める（余白の二重化防止）
 		$css_rules[] = '#adminmenu li.dcm-menu-before-separator ul.wp-submenu { padding-bottom: 0 !important; }';
@@ -1258,15 +1273,16 @@ tools.php</pre>
 	 */
 	private function build_accordion_data( array $groups ): ?array {
 		$accordion_groups = [];
-		$separator_group_id = 0;
+		$group_id         = 0;
 
 		foreach ( $groups as $group ) {
+			$group_id++;
+
 			if ( empty( $group['separator'] ) || 'separator_text' !== $group['separator']['type'] ) {
 				continue;
 			}
 
-			$separator_group_id++;
-			$separator_id = 'separator-group-' . $separator_group_id;
+			$separator_id = 'separator-group-' . $group_id;
 			// JS側は a[href]（wp-admin相対）で突合するため、コア同等のhrefに変換して渡す。
 			$menu_slugs = [];
 			foreach ( (array) $group['menus'] as $slug ) {
@@ -1359,19 +1375,19 @@ tools.php</pre>
 		
 		<?php
 		// 各グループのアイコン色を個別に設定（separator_textのみ）
-		$separator_group_id = 0;
+		$group_id = 0;
 		foreach ( $groups as $group ) {
+			$group_id++;
 			if ( empty( $group['separator'] ) || 'separator_text' !== $group['separator']['type'] ) {
 				continue;
 			}
-			$separator_group_id++;
 
 			$icon_color = ! empty( $group['separator']['icon_color'] ) ? $this->sanitize_color_code( $group['separator']['icon_color'] ) : '';
 			if ( empty( $icon_color ) ) {
 				continue;
 			}
 
-			$separator_id = esc_attr( 'separator-group-' . $separator_group_id );
+			$separator_id = esc_attr( 'separator-group-' . $group_id );
 			echo sprintf(
 				'li#%s.dcm-accordion-separator::before { color: %s !important; }' . "\n\t\t",
 				$separator_id,
@@ -1568,4 +1584,5 @@ tools.php</pre>
 
 // プラグイン初期化
 new DCM_Admin_Menu_Organizer();
+
 

@@ -93,6 +93,7 @@
 			// PHP側で現在地グループのセパレーターにクラス付与済み（JSは判定しない）
 			const mustStartExpanded = separatorLi.classList.contains('dcm-accordion-initial-open');
 			if (mustStartExpanded) {
+				// 初期展開状態を強制（ユーザーは後で閉じることができる）
 				state[separatorId] = 'expanded';
 				saveAccordionState(state);
 			}
@@ -114,7 +115,7 @@
 				// ignore
 			}
 
-			// セパレーターにARIA属性を付与（現在地グループも閉じられる）
+			// セパレーターにARIA属性を付与
 			separatorLi.setAttribute('tabindex', '0');
 			separatorLi.setAttribute('role', 'button');
 			separatorLi.setAttribute('aria-expanded', (!isCollapsed).toString());
