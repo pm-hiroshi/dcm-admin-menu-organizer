@@ -168,7 +168,6 @@
 			});
 		});
 
-		document.body.classList.remove('dcm-accordion-loading');
 		triggerResize();
 	}
 

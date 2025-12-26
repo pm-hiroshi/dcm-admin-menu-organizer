@@ -136,7 +136,6 @@ class DCM_Admin_Menu_Organizer {
 		add_action( 'admin_init', [ $this, 'register_settings' ] );
 		add_action( 'admin_menu', [ $this, 'reorder_admin_menu' ], 999 );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_separator_styles' ] );
-		add_filter( 'admin_body_class', [ $this, 'filter_admin_body_class' ] );
 		add_action( 'admin_head', [ $this, 'output_accordion_styles' ] );
 		add_action( 'admin_footer', [ $this, 'output_accordion_scripts' ] );
 
@@ -144,41 +143,6 @@ class DCM_Admin_Menu_Organizer {
 		add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), [ $this, 'add_reset_action_link' ] );
 		add_action( 'admin_init', [ $this, 'handle_reset_action' ] );
 		add_action( 'admin_notices', [ $this, 'render_reset_notice' ] );
-	}
-
-	/**
-	 * 管理画面の body class を調整（FOUC対策）
-	 *
-	 * @since 1.0.0
-	 *
-	 * @param string $classes 既存の body class
-	 *
-	 * @return string
-	 */
-	public function filter_admin_body_class( string $classes ): string {
-		// アコーディオンが無効の場合は何もしない
-		if ( ! $this->get_accordion_setting() ) {
-			return $classes;
-		}
-
-		// テキストセパレーターが無い場合は何もしない
-		$groups = $this->get_filtered_groups();
-		if ( null === $groups ) {
-			return $classes;
-		}
-
-		$has_text_separator = false;
-		foreach ( $groups as $group ) {
-			if ( ! empty( $group['separator'] ) && 'separator_text' === $group['separator']['type'] && ! empty( $group['menus'] ) ) {
-				$has_text_separator = true;
-				break;
-			}
-		}
-		if ( ! $has_text_separator ) {
-			return $classes;
-		}
-
-		return trim( $classes . ' dcm-accordion-loading' );
 	}
 
 	/**
@@ -1403,11 +1367,6 @@ tools.php</pre>
 		
 		.dcm-accordion-menu-item.dcm-hidden {
 			display: none !important;
-		}
-		
-		/* アコーディオン: 初期化中はメニューを非表示（FOUCを防ぐ） */
-		body.dcm-accordion-loading #adminmenu {
-			opacity: 0;
 		}
 		
 		/* 折りたたみ時はテキストを全角スペース1文字に（トグルアイコンのみ表示） */
