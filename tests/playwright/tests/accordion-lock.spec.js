@@ -1,7 +1,7 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
 
-test('現在地グループのセパレーターは閉じられない', async ({ page, baseURL }) => {
+test('現在地グループのセパレーターは初期展開されるが、ユーザーは閉じられる', async ({ page, baseURL }) => {
   test.setTimeout(120_000);
   const user = process.env.WP_ADMIN_USER || 'cursor';
   const pass = process.env.WP_ADMIN_PASS || 'cursor';
@@ -37,22 +37,43 @@ test('現在地グループのセパレーターは閉じられない', async ({
     }
   }
 
-  // ダッシュボードへ
+  // ダッシュボードへ（現在地を含むグループのセパレーターが初期展開される）
   await page.goto(dashboardPath);
   await page.waitForSelector('#adminmenu', { timeout: 30_000 });
 
-  // 現在地グループ用のロックが効いているセパレーターがある場合だけ検証する
-  const lockedSep = page.locator('#adminmenu > li.dcm-accordion-separator.dcm-accordion-locked');
-  const lockedCount = await lockedSep.count();
-  test.skip(lockedCount === 0, 'ロック対象のテキストセパレーターが見つからない環境のためスキップ');
-  const sep = lockedSep.first();
+  // localStorageをリセットして初期状態を確認
+  await page.evaluate(() => localStorage.removeItem('dcm_accordion_state'));
 
-  // ロックされていること
-  await expect(sep).toHaveClass(/dcm-accordion-locked/);
+  // 現在地グループ用の初期展開クラスが付与されているセパレーターを探す
+  const initialOpenSep = page.locator('#adminmenu > li.dcm-accordion-separator.dcm-accordion-initial-open');
+  const initialOpenCount = await initialOpenSep.count();
+  test.skip(initialOpenCount === 0, '初期展開対象のテキストセパレーターが見つからない環境のためスキップ');
+  const sep = initialOpenSep.first();
 
-  // クリックしても閉じないこと
+  // 初期展開クラスが付与されていること
+  await expect(sep).toHaveClass(/dcm-accordion-initial-open/);
+
+  // 初期状態で展開されていること（dcm-collapsedクラスがない）
+  await expect(sep).not.toHaveClass(/dcm-collapsed/);
+
+  // グループ内のメニューが表示されていることを確認
+  const separatorId = await sep.getAttribute('id');
+  expect(separatorId).toBeTruthy();
+  const groupClass = 'dcm-accordion-group-' + separatorId;
+  const menuItems = page.locator(`#adminmenu > li.${groupClass}`);
+  const menuItemsCount = await menuItems.count();
+  expect(menuItemsCount).toBeGreaterThan(0);
+  await expect(menuItems.first()).not.toHaveClass(/dcm-hidden/);
+
+  // クリックで閉じられること
+  await sep.click();
+  await expect(sep).toHaveClass(/dcm-collapsed/);
+  await expect(menuItems.first()).toHaveClass(/dcm-hidden/);
+
+  // 再度クリックで開けること
   await sep.click();
   await expect(sep).not.toHaveClass(/dcm-collapsed/);
+  await expect(menuItems.first()).not.toHaveClass(/dcm-hidden/);
 
   // baseURL を使っている場合に備えて参照だけ（lint対策）
   expect(baseURL || '').toContain('http');

@@ -137,7 +137,7 @@ class DCM_Admin_Menu_Organizer {
 		add_action( 'admin_menu', [ $this, 'reorder_admin_menu' ], 999 );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_separator_styles' ] );
 		add_action( 'admin_head', [ $this, 'output_accordion_styles' ] );
-		add_action( 'admin_footer', [ $this, 'output_accordion_scripts' ] );
+		add_action( 'admin_enqueue_scripts', [ $this, 'output_accordion_scripts' ] );
 
 		// プラグイン一覧から設定を初期化できるリンクを追加
 		add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), [ $this, 'add_reset_action_link' ] );
@@ -361,6 +361,28 @@ class DCM_Admin_Menu_Organizer {
 	}
 
 	/**
+	 * 設定を取得（ファイル優先、なければDB）
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param string $key 設定キー
+	 * @param mixed  $default デフォルト値（ファイル・DB両方にない場合）
+	 *
+	 * @return mixed 設定値
+	 */
+	private function get_setting( string $key, $default = null ) {
+		// ファイル設定を優先
+		$config = $this->load_config_from_file();
+		if ( null !== $config && isset( $config[ $key ] ) ) {
+			return $config[ $key ];
+		}
+
+		// ファイル設定がない場合はDBから取得
+		$settings = $this->get_db_settings();
+		return isset( $settings[ $key ] ) ? $settings[ $key ] : $default;
+	}
+
+	/**
 	 * メニュー順序の設定を取得（ファイル優先）
 	 *
 	 * @since 1.0.0
@@ -388,15 +410,7 @@ class DCM_Admin_Menu_Organizer {
 	 * @return bool アコーディオンが有効な場合は true
 	 */
 	private function get_accordion_setting(): bool {
-		// ファイル設定を優先
-		$config = $this->load_config_from_file();
-		if ( null !== $config && isset( $config['accordion_enabled'] ) ) {
-			return (bool) $config['accordion_enabled'];
-		}
-
-		// ファイル設定がない場合はDBから取得
-		$settings = $this->get_db_settings();
-		return ! empty( $settings['accordion_enabled'] );
+		return ! empty( $this->get_setting( 'accordion_enabled', false ) );
 	}
 
 	/**
@@ -407,15 +421,7 @@ class DCM_Admin_Menu_Organizer {
 	 * @return bool 未指定メニューを非表示にする場合は true
 	 */
 	private function get_hide_unspecified_setting(): bool {
-		// ファイル設定を優先
-		$config = $this->load_config_from_file();
-		if ( null !== $config && isset( $config['hide_unspecified'] ) ) {
-			return (bool) $config['hide_unspecified'];
-		}
-
-		// ファイル設定がない場合はDBから取得
-		$settings = $this->get_db_settings();
-		return ! empty( $settings['hide_unspecified'] );
+		return ! empty( $this->get_setting( 'hide_unspecified', false ) );
 	}
 
 	/**
@@ -906,8 +912,8 @@ tools.php</pre>
 			);
 
 			// テキスト表示用のスタイル（背景色と文字色を動的に設定）
-			// CSS content内の文字列をエスケープ（二重引用符とバックスラッシュ）
-			$escaped_text = addcslashes( $text, '"\\' );
+			// CSS content内の文字列をサニタイズ（</style>混入対策）
+			$escaped_text = addcslashes( wp_kses( $text, [] ), '"\\' );
 
 			// 左ボーダー幅（4px）ぶんの見た目を常に揃える（未指定時は透明にする）
 			$padding = '10px 12px 10px 8px';
@@ -1378,7 +1384,7 @@ tools.php</pre>
 	}
 
 	/**
-	 * アコーディオン機能のJavaScriptを出力
+	 * アコーディオン機能のJavaScriptをエンキュー
 	 *
 	 * @since 1.0.0
 	 *
