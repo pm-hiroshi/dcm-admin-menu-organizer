@@ -1,0 +1,56 @@
+/* static styles for admin menu organizer */
+#adminmenu li[id^="separator-"] {
+    margin-top: 6px;
+    margin-bottom: 6px;
+}
+
+#adminmenu li.dcm-menu-before-separator ul.wp-submenu {
+    padding-bottom: 0;
+}
+
+#adminmenu li.dcm-menu-before-separator {
+    margin-bottom: 0;
+}
+
+.dcm-accordion-separator {
+    cursor: pointer;
+    position: relative;
+}
+
+.dcm-accordion-separator:hover::after {
+    opacity: 0.8;
+}
+
+.dcm-accordion-separator::before {
+    content: "\f140";
+    /* dashicons-arrow-down */
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: dashicons;
+    font-size: 16px;
+    line-height: 1;
+    color: #fff;
+    transition: transform 0.2s ease;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.dcm-accordion-separator.dcm-collapsed::before {
+    content: "\f139";
+    /* dashicons-arrow-right */
+}
+
+.dcm-accordion-menu-item {
+    transition: all 0.3s ease;
+}
+
+.dcm-accordion-menu-item.dcm-hidden {
+    display: none !important;
+}
+
+body.folded #adminmenu > li.dcm-accordion-separator::after {
+    /* Use a full-width space to hide label text */
+    content: "\3000";
+}

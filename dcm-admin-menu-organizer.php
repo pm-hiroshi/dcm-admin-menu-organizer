@@ -3,7 +3,7 @@
  * Plugin Name: DCM Admin Menu Organizer
  * Plugin URI: 
  * Description: 管理画面の親メニューの表示順を制御し、セパレーターを追加できます。
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: pm-hiroshi
  * Author URI: 
  * License: GPL v2 or later
@@ -134,10 +134,10 @@ class DCM_Admin_Menu_Organizer {
 
 		add_action( 'admin_menu', [ $this, 'add_settings_page' ] );
 		add_action( 'admin_init', [ $this, 'register_settings' ] );
-		add_action( 'admin_menu', [ $this, 'reorder_admin_menu' ], 999 );
+		add_action( 'admin_head', [ $this, 'reorder_admin_menu' ], PHP_INT_MAX );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_separator_styles' ] );
-		add_action( 'admin_head', [ $this, 'output_accordion_styles' ] );
-		add_action( 'admin_enqueue_scripts', [ $this, 'output_accordion_scripts' ] );
+		add_action( 'admin_footer', [ $this, 'output_dynamic_styles_in_footer' ] );
+		add_action( 'admin_footer', [ $this, 'output_accordion_scripts_in_footer' ] );
 
 		// プラグイン一覧から設定を初期化できるリンクを追加
 		add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), [ $this, 'add_reset_action_link' ] );
@@ -712,9 +712,19 @@ tools.php</pre>
 			$group_id++;
 			$accordion_group_class = '';
 			$is_text_separator     = false;
+			$visible_group_menus   = [];
+
+			foreach ( $group['menus'] as $slug ) {
+				if ( isset( $menu_by_slug[ $slug ] ) ) {
+					$visible_group_menus[] = $slug;
+				}
+			}
 
 			// セパレーター（グループがある場合のみ）
 			if ( ! empty( $group['separator'] ) ) {
+				if ( empty( $visible_group_menus ) ) {
+					continue;
+				}
 				$sep = $group['separator'];
 				if ( 'separator' === $sep['type'] ) {
 					// 通常のセパレーター
@@ -731,8 +741,8 @@ tools.php</pre>
 					$id                         = 'separator-group-' . $group_id;
 					// 現在地を含むグループは初期展開用のクラスを付与（ロックはしない）
 					$initial_open_class = '';
-					if ( '' !== $current_top_slug && ! empty( $group['menus'] ) ) {
-						if ( in_array( $current_top_slug, (array) $group['menus'], true ) ) {
+					if ( '' !== $current_top_slug && ! empty( $visible_group_menus ) ) {
+						if ( in_array( $current_top_slug, (array) $visible_group_menus, true ) ) {
 							$initial_open_class = ' dcm-accordion-initial-open';
 						}
 					}
@@ -751,7 +761,7 @@ tools.php</pre>
 			}
 
 			// グループ内のメニュー
-			foreach ( $group['menus'] as $slug ) {
+			foreach ( $visible_group_menus as $slug ) {
 				if ( isset( $menu_by_slug[ $slug ] ) ) {
 					$item = $menu_by_slug[ $slug ]['item'];
 
@@ -860,13 +870,29 @@ tools.php</pre>
 	}
 
 	/**
-	 * セパレーター用のスタイルを出力
+	 * 固定のスタイルをエンキュー
 	 *
 	 * @since 1.0.0
 	 *
 	 * @return void
 	 */
 	public function enqueue_separator_styles(): void {
+		wp_enqueue_style(
+			'dcm-admin-menu-organizer',
+			plugin_dir_url( __FILE__ ) . 'assets/css/dcm-admin-menu-organizer.css',
+			[],
+			'1.0.1'
+		);
+	}
+
+	/**
+	 * 動的なセパレーター/アコーディオン用スタイルをフッターで出力
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return void
+	 */
+	public function output_dynamic_styles_in_footer(): void {
 		// フィルタリング済みグループを取得（キャッシュされている）
 		$groups = $this->get_filtered_groups();
 		if ( null === $groups ) {
@@ -893,11 +919,13 @@ tools.php</pre>
 			$bg_color     = ! empty( $sep['bg_color'] ) ? $sep['bg_color'] : '';
 			$text_color   = ! empty( $sep['text_color'] ) ? $sep['text_color'] : '#a0a5aa';
 			$border_color = ! empty( $sep['border_color'] ) ? $sep['border_color'] : '';
+			$icon_color   = ! empty( $sep['icon_color'] ) ? $sep['icon_color'] : '';
 
 			// カラーコードのバリデーション（CSSインジェクション対策）
 			$bg_color     = $this->sanitize_color_code( $bg_color );
 			$text_color   = $this->sanitize_color_code( $text_color );
 			$border_color = $this->sanitize_color_code( $border_color );
+			$icon_color   = $this->sanitize_color_code( $icon_color );
 
 			// separatorのli要素自体のスタイル
 			$css_rules[] = sprintf(
@@ -942,19 +970,24 @@ tools.php</pre>
 
 			$css_rules[] = sprintf( 'li#%s::after { %s }', esc_attr( $id ), $after_styles );
 
+			if ( ! empty( $icon_color ) ) {
+				$css_rules[] = sprintf(
+					'li#%s.dcm-accordion-separator::before { color: %s !important; }',
+					esc_attr( $id ),
+					$icon_color
+				);
+			}
+
 		}
 
-		// 独自セパレーターのmargin-bottomを0にする（変な隙間をなくす）
-		$css_rules[] = '#adminmenu li[id^="separator-"] { margin-top: 6px !important; margin-bottom: 6px !important; }';
-
-		// セパレーター直前のメニュー（JSでクラス付与済み）はサブメニュー下余白を詰める（余白の二重化防止）
-		$css_rules[] = '#adminmenu li.dcm-menu-before-separator ul.wp-submenu { padding-bottom: 0 !important; }';
-		$css_rules[] = '#adminmenu li.dcm-menu-before-separator { margin-bottom: 0 !important; }';
-
-		if ( ! empty( $css_rules ) ) {
-			$css = implode( "\n", $css_rules );
-			wp_add_inline_style( 'common', $css );
+		if ( empty( $css_rules ) ) {
+			return;
 		}
+
+		printf(
+			'<style id="dcm-admin-menu-organizer-dynamic-styles">%s</style>',
+			implode( "\n", $css_rules )
+		);
 	}
 
 	/**
@@ -1295,102 +1328,13 @@ tools.php</pre>
 	}
 
 	/**
-	 * アコーディオン機能のCSSを出力
+	 * アコーディオン機能のJavaScriptとデータをフッターで出力
 	 *
 	 * @since 1.0.0
 	 *
 	 * @return void
 	 */
-	public function output_accordion_styles(): void {
-		if ( ! $this->get_accordion_setting() ) {
-			return;
-		}
-
-		$groups = $this->get_filtered_groups();
-		if ( null === $groups ) {
-			return;
-		}
-
-		?>
-		<style id="dcm-accordion-styles">
-		/* アコーディオン: セパレーターをクリック可能に */
-		.dcm-accordion-separator {
-			cursor: pointer !important;
-			position: relative;
-		}
-		
-		.dcm-accordion-separator:hover::after {
-			opacity: 0.8;
-		}
-		
-		/* アコーディオン: 開閉アイコン（デフォルト） */
-		.dcm-accordion-separator::before {
-			content: '\f140'; /* dashicons-arrow-down */
-			position: absolute;
-			right: 12px;
-			top: 50%;
-			transform: translateY(-50%);
-			font-family: dashicons;
-			font-size: 16px;
-			line-height: 1;
-			color: #fff;
-			transition: transform 0.2s ease;
-			pointer-events: none;
-			z-index: 1;
-		}
-		
-		.dcm-accordion-separator.dcm-collapsed::before {
-			content: '\f139'; /* dashicons-arrow-right */
-		}
-		
-		<?php
-		// 各グループのアイコン色を個別に設定（separator_textのみ）
-		$group_id = 0;
-		foreach ( $groups as $group ) {
-			$group_id++;
-			if ( empty( $group['separator'] ) || 'separator_text' !== $group['separator']['type'] ) {
-				continue;
-			}
-
-			$icon_color = ! empty( $group['separator']['icon_color'] ) ? $this->sanitize_color_code( $group['separator']['icon_color'] ) : '';
-			if ( empty( $icon_color ) ) {
-				continue;
-			}
-
-			$separator_id = esc_attr( 'separator-group-' . $group_id );
-			echo sprintf(
-				'li#%s.dcm-accordion-separator::before { color: %s !important; }' . "\n\t\t",
-				$separator_id,
-				$icon_color
-			);
-		}
-		?>
-		
-		/* アコーディオン: グループメニューの開閉アニメーション */
-		.dcm-accordion-menu-item {
-			transition: all 0.3s ease;
-		}
-		
-		.dcm-accordion-menu-item.dcm-hidden {
-			display: none !important;
-		}
-		
-		/* 折りたたみ時はテキストを全角スペース1文字に（トグルアイコンのみ表示） */
-		body.folded #adminmenu > li.dcm-accordion-separator::after {
-			content: "\3000" !important;
-		}
-		</style>
-		<?php
-	}
-
-	/**
-	 * アコーディオン機能のJavaScriptをエンキュー
-	 *
-	 * @since 1.0.0
-	 *
-	 * @return void
-	 */
-	public function output_accordion_scripts(): void {
+	public function output_accordion_scripts_in_footer(): void {
 		if ( ! $this->get_accordion_setting() ) {
 			return;
 		}
@@ -1423,18 +1367,17 @@ tools.php</pre>
 			'config_hash' => $config_hash,
 		];
 
+		printf(
+			'<script>window.dcmAdminMenuAccordionData = %s;</script>',
+			wp_json_encode( $inline_data )
+		);
+
 		wp_enqueue_script(
 			'dcm-admin-accordion',
 			plugin_dir_url( __FILE__ ) . 'assets/js/dcm-admin-accordion.js',
 			[],
 			'1.0.0',
 			true
-		);
-
-		wp_add_inline_script(
-			'dcm-admin-accordion',
-			'window.dcmAdminMenuAccordionData = ' . wp_json_encode( $inline_data ) . ';',
-			'before'
 		);
 	}
 

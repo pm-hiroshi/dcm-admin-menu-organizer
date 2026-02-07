@@ -19,8 +19,9 @@ test('管理メニュー並び替え: 主要フロー', async ({ page, baseURL }
   const user = process.env.WP_ADMIN_USER || 'cursor';
   const pass = process.env.WP_ADMIN_PASS || 'cursor';
 
-  const settingsPath = '/wp-admin/options-general.php?page=dcm-menu-organizer';
-  const dashboardPath = '/wp-admin/index.php';
+  const settingsPath = 'wp-admin/options-general.php?page=dcm-menu-organizer';
+  const dashboardPath = 'wp-admin/index.php';
+  const loginUrl = process.env.WP_LOGIN_URL || '';
 
   async function attachJson(name, data) {
     await testInfo.attach(name, {
@@ -39,7 +40,12 @@ test('管理メニュー並び替え: 主要フロー', async ({ page, baseURL }
   async function loginIfNeeded() {
     // settingsページへ行き、ログイン画面ならログインして戻る
     await page.goto(settingsPath);
-    if (page.url().includes('/wp-login.php')) {
+    if (!(await page.locator('#user_login').count()) && loginUrl) {
+      const redirectUrl = `${loginUrl}?redirect_to=${encodeURIComponent(settingsPath)}`;
+      await page.goto(redirectUrl);
+    }
+
+    if (page.url().includes('/wp-login.php') || await page.locator('#user_login').count()) {
       // WordPressのログインフォームは文言/言語で揺れるので、idで確実に埋める
       await page.locator('#user_login').fill(user);
       await page.locator('#user_pass').fill(pass);
@@ -55,7 +61,7 @@ test('管理メニュー並び替え: 主要フロー', async ({ page, baseURL }
         const loginError = await page.locator('#login_error').textContent().catch(() => null);
         throw new Error(
           [
-            'ログイン後も wp-login.php のままです（ログイン失敗の可能性）。',
+            'ログイン後もログイン画面のままです（ログイン失敗の可能性）。',
             loginError ? `login_error: ${loginError.trim()}` : 'login_error: (none)',
           ].join('\n')
         );
@@ -96,7 +102,7 @@ test('管理メニュー並び替え: 主要フロー', async ({ page, baseURL }
       'separator: グループB|#f0f6fc|#0969da|#0969da',
       'index.php',
       'edit.php',
-    ].join('\\n'));
+    ].join('\n'));
     await page.locator('#dcm_admin_menu_accordion_enabled').check();
     await page.getByRole('button', { name: '設定を保存' }).click();
     await expect(page.getByText('設定を保存しました。')).toBeVisible();
@@ -116,7 +122,7 @@ test('管理メニュー並び替え: 主要フロー', async ({ page, baseURL }
       const cls = Array.from(el.classList).find((c) => c.startsWith('dcm-accordion-group-separator-group-'));
       return cls ? cls.replace('dcm-accordion-group-', '') : '';
     });
-    expect(groupASeparatorId).toMatch(/^separator-group-\\d+$/);
+    expect(groupASeparatorId).toMatch(/^separator-group-\d+$/);
 
     const sep = page.locator(`#${groupASeparatorId}`);
     await expect(sep).toBeVisible();
