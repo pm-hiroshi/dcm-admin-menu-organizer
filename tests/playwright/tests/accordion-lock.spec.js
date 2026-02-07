@@ -6,12 +6,18 @@ test('現在地グループのセパレーターは初期展開されるが、�
   const user = process.env.WP_ADMIN_USER || 'cursor';
   const pass = process.env.WP_ADMIN_PASS || 'cursor';
 
-  const settingsPath = '/wp-admin/options-general.php?page=dcm-menu-organizer';
-  const dashboardPath = '/wp-admin/index.php';
+  const settingsPath = 'wp-admin/options-general.php?page=dcm-menu-organizer';
+  const dashboardPath = 'wp-admin/index.php';
+  const loginUrl = process.env.WP_LOGIN_URL || '';
 
   // settingsページへ行き、ログイン画面ならログインして戻る
   await page.goto(settingsPath, { waitUntil: 'domcontentloaded' });
-  if (page.url().includes('/wp-login.php')) {
+  if (!(await page.locator('#user_login').count()) && loginUrl) {
+    const redirectUrl = `${loginUrl}?redirect_to=${encodeURIComponent(settingsPath)}`;
+    await page.goto(redirectUrl, { waitUntil: 'domcontentloaded' });
+  }
+
+  if (page.url().includes('/wp-login.php') || await page.locator('#user_login').count()) {
     await page.locator('#user_login').fill(user);
     await page.locator('#user_pass').fill(pass);
     // wait を先に張ってからクリック（取りこぼし防止）

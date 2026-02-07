@@ -289,6 +289,11 @@ location.reload();
 ```
 dcm-admin-menu-organizer/
 ├── dcm-admin-menu-organizer.php  # メインファイル
+├── assets/
+│   ├── css/
+│   │   └── dcm-admin-menu-organizer.css
+│   └── js/
+│       └── dcm-admin-accordion.js
 └── README.md                      # このファイル
 ```
 
@@ -300,9 +305,10 @@ dcm-admin-menu-organizer/
 
 - `admin_menu` (優先度: 10) - 設定ページを追加
 - `admin_init` - 設定を登録
-- `admin_menu` (優先度: 999) - メニューを並び替え
-- `admin_enqueue_scripts` - セパレーター用のCSSを出力
-- `admin_enqueue_scripts` - アコーディオン用のJavaScript/CSSを出力
+- `admin_head` (優先度: PHP_INT_MAX) - メニューを並び替え（最終確定後に適用）
+- `admin_enqueue_scripts` - 静的CSSを読み込み
+- `admin_footer` - 動的CSSを出力
+- `admin_footer` - アコーディオン用のJSデータを出力
 
 #### フィルターフック
 
@@ -337,6 +343,13 @@ add_filter( 'dcm_admin_menu_organizer_config_file', function( $config_file ) {
 ## ライセンス
 
 GPL v2 or later
+
+## Changelog
+
+### 1.0.1
+- メニュー並び替えの実行タイミングを `admin_head` 終盤に変更
+- 動的CSS/JSデータの出力タイミングを `admin_footer` に移動
+- 静的CSSをファイル化して読み込み
 
 ## サポート
 
